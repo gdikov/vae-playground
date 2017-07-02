@@ -5,7 +5,7 @@ import logging
 import keras.backend as ker
 
 from numpy import pi as pi_const
-from keras.layers import Lambda, Multiply, Add
+from keras.layers import Lambda, Multiply, Add, Dense, Concatenate
 from keras.models import Input
 from keras.models import Model
 
@@ -263,6 +263,97 @@ class ReparametrisedGaussianEncoder(BaseEncoder):
 
         Returns:
             An Encoder model.
+        """
+        is_learning = kwargs.get('is_learning', True)
+        if is_learning:
+            return self.encoder_learning_model(args[0])
+        else:
+            return self.encoder_inference_model(args[0])
+
+
+class ReparametrisedGaussianConjointEncoder(object):
+    """
+    A ReparametrisedGaussianConjointEncoder parametrises a Gaussian latent distribution given two (or more) datasets,
+    by partially sharing the latent vector between two (or more) encoders:
+
+          Data_1                      Data_2
+            |                           |
+       -------------              -------------
+       | Encoder_1 |              | Encoder_2 |
+       -------------              -------------
+            |                           |
+        Latent_1 -- Latent_shared -- Latent_2
+        \_______________  __________________/
+                        V
+               latent mu & sigma
+                        V
+            mu + sigma * Noise   <--- Reparametrised Gaussian latent space
+
+    """
+    def __init__(self, data_dims, latent_dims, network_architecture='synthetic'):
+        """
+        Args:
+            data_dims: tuple, flattened data dimension for each dataset
+            latent_dims: tuple, flattened latent dimensions for each private latent space and the dimension
+                of the shared space.
+            network_architecture: str, the codename of the encoder network architecture (will be the same for all)
+        """
+        assert len(latent_dims) == len(data_dims) + 1, \
+            "Expected too receive {} private latent spaces and one shared for {} data inputs " \
+            "but got {} instead.".format(len(data_dims) + 1, len(data_dims), len(latent_dims))
+
+        # NOTE: this encoder is better off not having BaseEncoder as super class.
+        # This might be refactored in the future if multiple variations of the conjoint model are to be implemented,
+        # and this class can be used as a base class for them.
+        name = 'Reparametrised Gaussian Conjoint Encoder'
+        logger.info("Initialising {} model with {}-dimensional data inputs "
+                    "and {}-dimensional latent outputs (last one is shared)".format(name, data_dims, latent_dims))
+
+        def lin_transform_standard_gaussian(params):
+            from keras.backend import exp
+            mu, log_sigma, z = params
+            transformed_z = mu + exp(log_sigma / 2.0) * z
+            return transformed_z
+
+        inputs, outputs, latent_means, latent_log_vars = [], [], [], []
+        shared_latent_space = Dense(latent_dims[-1], activation=None, name='enc_shared_latent_space')
+        for i in range(len(data_dims)):
+            data_input = Input(shape=(data_dims[i]), name="enc_data_input_{}".format(i))
+            features = get_network_by_name['conjoint_encoder'][network_architecture](data_input)
+            standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler_{}'.format(i))
+            standard_normal_sampler.arguments = {'data_dim': data_dims[i], 'noise_dim': latent_dims[i],
+                                                 'seed': config['seed']}
+            noise = standard_normal_sampler(data_input)
+            latent_mean = Dense(latent_dims[i], activation=None, name='enc_mean_{}'.format(i))(features)
+            # since the variance must be positive and this is not easy to restrict, take it in the log domain
+            # and exponentiate it during the reparametrisation
+            latent_log_var = Dense(latent_dims[i], activation=None, name='enc_var_{}'.format(i))(features)
+            private_latent_space = Lambda(lin_transform_standard_gaussian,
+                                          name='enc_private_latent_{}'.format(i))([latent_mean, latent_log_var, noise])
+            merged_latent_space = Concatenate(axis=-1, name='enc_merge_{}'.format(i))(private_latent_space,
+                                                                                      shared_latent_space(features))
+            inputs.append(data_input)
+            outputs.append(merged_latent_space)
+            latent_means.append(latent_mean)
+            latent_log_vars.append(latent_log_var)
+
+        self.encoder_inference_model = Model(inputs=inputs, outputs=outputs, name='encoder_inference')
+        self.encoder_learning_model = Model(inputs=inputs,
+                                            outputs=[outputs, latent_means, latent_log_vars],
+                                            name='encoder_learning')
+
+    def __call__(self, *args, **kwargs):
+        """
+        Make the encoder callable on a list of data inputs.
+
+        Args:
+            *args: list or tuple, Keras input tensors for the data arrays from each dataset
+
+        Keyword Args:
+            is_learning: bool, whether the model is used in training or testing
+
+        Returns:
+            The output of the model called on the input tensor
         """
         is_learning = kwargs.get('is_learning', True)
         if is_learning:
