@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from ..utils.config import load_config
 from .losses import VAELossLayer
-from .networks import ReparametrisedGaussianEncoder, Decoder
+from .networks import ReparametrisedGaussianEncoder, StandardDecoder
 from ..data_iterator import VAEDataIterator
 from ..models import BaseVariationalAutoencoder
 
@@ -30,8 +30,8 @@ class GaussianVariationalAutoencoder(BaseVariationalAutoencoder):
 
         self.encoder = ReparametrisedGaussianEncoder(data_dim=data_dim, noise_dim=latent_dim, latent_dim=latent_dim,
                                                      network_architecture=experiment_architecture)
-        self.decoder = Decoder(data_dim=data_dim, latent_dim=latent_dim,
-                               network_architecture=experiment_architecture)
+        self.decoder = StandardDecoder(data_dim=data_dim, latent_dim=latent_dim,
+                                       network_architecture=experiment_architecture)
 
         # init the base class' inputs and testing models and reuse them
         super(GaussianVariationalAutoencoder, self).__init__(data_dim=data_dim, noise_dim=latent_dim,
