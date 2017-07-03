@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import logging
 
-from keras.layers import Lambda, Dense
+from keras.layers import Lambda, Dense, Concatenate
 from keras.models import Model, Input
 
 from .architectures import get_network_by_name
@@ -134,25 +134,32 @@ class ConjointDecoder(object):
             log_px = Bernoulli(probs=mu, name='dec_bernoulli').log_prob(x)
             return log_px
 
-        latent_inputs, data_inputs, sampling_outputs, log_probs = [], [], [], []
+        data_inputs = [Input(shape=(d,), name='dec_data_input_{}'.format(i)) for i, d in enumerate(data_dims)]
+        latent_input = Input(shape=(sum(latent_dims),), name='dec_latent_input')
+
+        # evt. set the output_shape arg.
+        shared_latent_factors = Lambda(lambda x: x[0][:, -x[1]:])([latent_input, latent_dims[-1]])
+
+        sampling_outputs, log_probs = [], []
+        stop_id = 0
         for i in range(len(data_dims)):
-            latent_input = Input(shape=(latent_dims[i],), name='dec_latent_input_{}'.format(i))
-            generator_body = get_network_by_name['decoder'][network_architecture](latent_input)
+            start_id = stop_id
+            stop_id += latent_dims[i]
+            latent_i = Lambda(lambda x: x[0][:, x[1]:x[2]])([latent_input, start_id, stop_id])
+            latent_i = Concatenate(axis=-1, name='dec_merged_latent_{}'.format(i))([latent_i, shared_latent_factors])
+            generator_body = get_network_by_name['decoder'][network_architecture](latent_i)
             sampler_params = Dense(data_dims[i], activation='sigmoid',
                                    name='dec_sampler_params_{}'.format(i))(generator_body)
             # probability clipping is necessary for the Bernoulli `log_prob` property produces NaNs in the limit cases
             sampler_params = Lambda(lambda x: 1e-6 + (1 - 2e-6) * x,
                                     name='dec_probs_clipper_{}'.format(i))(sampler_params)
-            data_input = Input(shape=(data_dims[i],), name='dec_data_input_{}'.format(i))
             log_prob = Lambda(bernoulli_log_probs,
-                              name='dec_bernoulli_logprob_{}'.format(i))([sampler_params, data_input])
-            latent_inputs.append(latent_input)
-            data_inputs.append(data_input)
+                              name='dec_bernoulli_logprob_{}'.format(i))([sampler_params, data_inputs[i]])
             sampling_outputs.append(sampler_params)
             log_probs.append(log_prob)
 
-        self.generator = Model(inputs=latent_inputs, outputs=sampling_outputs, name='dec_sampling')
-        self.ll_estimator = Model(inputs=[data_inputs, latent_inputs], outputs=log_probs, name='dec_trainable')
+        self.generator = Model(inputs=latent_input, outputs=sampling_outputs, name='dec_sampling')
+        self.ll_estimator = Model(inputs=data_inputs + [latent_input], outputs=log_probs, name='dec_trainable')
 
     def __call__(self, *args, **kwargs):
         """
