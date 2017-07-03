@@ -1,6 +1,9 @@
 import gzip
 import logging
 import struct
+import scipy.io
+from skimage import color
+import urllib.request
 
 import numpy as np
 import os
@@ -12,6 +15,84 @@ config = load_config("global_config.yaml")
 
 PROJECT_DATA_DIR = config['data_dir']
 np.random.seed(config['seed'])
+
+def load_svhn(local_data_path=None, one_hot=True, grayscale=True):
+    """
+    Load the SVHN dataset from local file or download it if not available.
+
+    Args:
+        local_data_path: path to the SVHN dataset. Assumes unpacked files and original filenames.
+        one_hot: bool whether tha data targets should be converted to one hot encoded labels
+        grayscale: bool, whether the images should be converted to a grayscale images.
+
+    Returns:
+        A dict with `data` and `target` keys with the SVHN data converted to grayscale images.
+    """
+
+    def convert_to_one_hot(raw_target):
+        n_uniques = len(np.unique(raw_target))
+        one_hot_target = np.zeros((raw_target.shape[0], n_uniques))
+        one_hot_target[np.arange(raw_target.shape[0]), raw_target.astype(np.int)] = 1
+        return one_hot_target
+
+    def convert_to_grayscale(raw_data):
+        # converts the h x w x 3 images to h x w images with grayscale values
+        # the conversion used is Y = 0.2125 R + 0.7154 G + 0.0721 B
+        gray_data = np.zeros([raw_data.shape[0], raw_data.shape[1], raw_data.shape[3]])
+        for i in range(raw_data.shape[-1]):
+            gray_data[:, :, i] = color.rgb2gray(raw_data[:, :, :, i])
+        return gray_data
+
+    svhn_path = os.path.join(PROJECT_DATA_DIR, "SVHN")
+    if local_data_path is None and not os.path.exists(svhn_path):
+        logger.info("Path to locally stored data not provided. Proceeding with downloading the SVHN dataset.")
+        url = 'http://ufldl.stanford.edu/housenumbers/train_32x32.mat'
+        os.mkdir(svhn_path)
+        file_name = svhn_path + '/train_32x32.mat'
+        urllib.request.urlretrieve(url, file_name)
+        svhn_imgs, svhn_labels = _load_svhn_from_file(svhn_path)
+        if one_hot:
+            svhn_labels = convert_to_one_hot(svhn_labels)
+        svhn = {'data': svhn_imgs, 'target': svhn_labels}
+    else:
+        local_data_path = local_data_path or svhn_path
+        logger.info("Loading SVHN dataset from {}".format(local_data_path))
+        if os.path.exists(local_data_path):
+            svhn_imgs, svhn_labels = _load_svhn_from_file(local_data_path)
+            if one_hot:
+                svhn_labels = convert_to_one_hot(svhn_labels)
+            svhn = {'data': svhn_imgs, 'target': svhn_labels}
+        else:
+            logger.error("Path to locally stored SVHN does not exist.")
+            raise ValueError
+
+    if grayscale:
+        svhn['data'] = convert_to_grayscale(svhn['data'])
+
+    return svhn
+
+
+def _load_svhn_from_file(data_dir=None):
+    """
+    Load the binary files from disk.
+
+    Args:
+        data_dir: path to folder containing the SVHN dataset blobs in a .mat file.
+
+    Returns:
+        A numpy array with the images and a numpy array with the corresponding labels.
+    """
+    # The files are assumed to have these names and should be found in 'path'
+
+    train_file = data_dir+'/train_32x32.mat'
+
+    train_dict = scipy.io.loadmat(train_file)
+    images = np.asarray(train_dict['X'])
+    labels = np.asarray(train_dict['y'])
+    labels = labels.flatten()
+    labels[labels > 9] = 0
+
+    return images, labels
 
 
 def load_mnist(local_data_path=None, one_hot=True, binarised=True):
