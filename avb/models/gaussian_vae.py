@@ -7,9 +7,8 @@ from tqdm import tqdm
 
 from ..utils.config import load_config
 from .losses import VAELossLayer
-from .networks import ReparametrisedGaussianEncoder, StandardDecoder, \
-    ReparametrisedGaussianConjointEncoder, ConjointDecoder
-from ..data_iterator import VAEDataIterator
+from .networks import ReparametrisedGaussianEncoder, StandardDecoder
+from ..data_iterator import VAEDataIterator, ConjointVAEDataIterator
 from ..models import BaseVariationalAutoencoder
 
 config = load_config('global_config.yaml')
@@ -92,22 +91,31 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
             optimiser_params: dict, optional optimiser parameters
         """
         self.name = "conjoint_gaussian_vae"
-        self.models_dict = {'conjoint_vae_model': None}
+        self.models_dict = {'vae_model': None}
 
-        self.encoder = ReparametrisedGaussianConjointEncoder(data_dims=data_dims, latent_dims=latent_dims,
-                                                             network_architecture=experiment_architecture)
-        self.decoder = ConjointDecoder(data_dims=data_dims, latent_dims=latent_dims,
-                                       network_architecture=experiment_architecture)
-
+        self.encoder, self.decoder = [], []
+        for i in range(len(data_dims)):
+            encoder = ReparametrisedGaussianEncoder(data_dim=data_dims[i], noise_dim=latent_dims[i],
+                                                    latent_dim=latent_dims[i],
+                                                    network_architecture=experiment_architecture)
+            decoder = StandardDecoder(data_dim=data_dims[i], latent_dim=latent_dims[i],
+                                      network_architecture=experiment_architecture)
+            self.encoder.append(encoder)
+            self.decoder.append(decoder)
         # init the base class' inputs and testing models and reuse them
         super(ConjointGaussianVariationalAutoencoder, self).__init__(data_dim=data_dims, noise_dim=latent_dims,
                                                                      latent_dim=latent_dims, name_prefix=self.name)
 
-        posterior_approximation, latent_mean, latent_log_var = self.encoder(self.data_input, is_learning=True)
-        reconstruction_log_likelihood = self.decoder([self.data_input, posterior_approximation], is_learning=True)
-        vae_loss = VAELossLayer(name='vae_loss')([reconstruction_log_likelihood, latent_mean, latent_log_var])
+        losses = []
+        for i in range(len(data_dims)):
+            posterior_approximation, latent_mean, latent_log_var = self.encoder[i](self.data_input[i],
+                                                                                   is_learning=True)
+            reconstruction_log_likelihood = self.decoder[i]([self.data_input, posterior_approximation],
+                                                            is_learning=True)
+            vae_loss = VAELossLayer(name='vae_loss')([reconstruction_log_likelihood, latent_mean, latent_log_var])
+            losses.append(vae_loss)
 
-        self.vae_model = Model(inputs=self.data_input, outputs=vae_loss)
+        self.vae_model = Model(inputs=self.data_input, outputs=losses)
 
         if resume_from is not None:
             self.load(resume_from, custom_layers={'VAELossLayer': VAELossLayer})
@@ -116,11 +124,11 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
         self.vae_model.compile(optimizer=RMSprop(**optimiser_params), loss=None)
 
         self.models_dict['vae_model'] = self.vae_model
-        self.data_iterator = VAEDataIterator(data_dim=data_dim, latent_dim=latent_dim, seed=config['seed'])
+        self.data_iterator = ConjointVAEDataIterator(data_dim=data_dims, latent_dim=latent_dims, seed=config['seed'])
 
     def fit(self, data, batch_size=32, epochs=1, **kwargs):
         """
-        Fit the Conjoint Gaussian Variational Autoencoder onto the training data.
+        Fit the Gaussian Variational Autoencoder onto the training data.
 
         Args:
             data: ndarray, training data
