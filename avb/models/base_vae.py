@@ -34,8 +34,16 @@ class BaseVariationalAutoencoder(object):
         if not hasattr(self, 'encoder') and hasattr(self, 'decoder'):
             raise AttributeError("Initialise the attributes `encoder` and `decoder` in the child classes first!")
 
-        self.data_input = Input(shape=(data_dim,), name='{}_data_input'.format(name_prefix))
-        self.latent_input = Input(shape=(latent_dim,), name='{}_latent_prior_input'.format(name_prefix))
+        if isinstance(data_dim, int):
+            self.data_input = Input(shape=(data_dim,), name='{}_data_input'.format(name_prefix))
+        elif isinstance(data_dim, (tuple, list)):
+            self.data_input = [Input(shape=(d,), name='{}_data_input_{}'.format(name_prefix, i))
+                               for i, d in enumerate(data_dim)]
+        if isinstance(latent_dim, int):
+            self.latent_input = Input(shape=(latent_dim,), name='{}_latent_prior_input'.format(name_prefix))
+        elif isinstance(latent_dim, (tuple, list)):
+            self.latent_input = [Input(shape=(d,), name='{}_latent_prior_input_{}'.format(name_prefix, i))
+                                 for d, i in enumerate(latent_dim)]
 
         # define the testing models
         self.inference_model = Model(inputs=self.data_input,
