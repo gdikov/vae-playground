@@ -315,31 +315,39 @@ class ReparametrisedGaussianConjointEncoder(object):
             transformed_z = mu + exp(log_sigma / 2.0) * z
             return transformed_z
 
-        inputs, outputs, latent_means, latent_log_vars = [], [], [], []
-        shared_latent_space = Dense(latent_dims[-1], activation=None, name='enc_shared_latent_space')
+        inputs, latent_space, latent_means, latent_log_vars, features = [], [], [], [], []
         for i in range(len(data_dims)):
             data_input = Input(shape=(data_dims[i]), name="enc_data_input_{}".format(i))
-            features = get_network_by_name['conjoint_encoder'][network_architecture](data_input)
-            standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler_{}'.format(i))
-            standard_normal_sampler.arguments = {'data_dim': data_dims[i], 'noise_dim': latent_dims[i],
-                                                 'seed': config['seed']}
-            noise = standard_normal_sampler(data_input)
-            latent_mean = Dense(latent_dims[i], activation=None, name='enc_mean_{}'.format(i))(features)
+            features_i = get_network_by_name['conjoint_encoder'][network_architecture](data_input)
+            private_latent_mean = Dense(latent_dims[i], activation=None, name='enc_mean_{}'.format(i))(features_i)
             # since the variance must be positive and this is not easy to restrict, take it in the log domain
             # and exponentiate it during the reparametrisation
-            latent_log_var = Dense(latent_dims[i], activation=None, name='enc_var_{}'.format(i))(features)
-            private_latent_space = Lambda(lin_transform_standard_gaussian,
-                                          name='enc_private_latent_{}'.format(i))([latent_mean, latent_log_var, noise])
-            merged_latent_space = Concatenate(axis=-1, name='enc_merge_{}'.format(i))(private_latent_space,
-                                                                                      shared_latent_space(features))
-            inputs.append(data_input)
-            outputs.append(merged_latent_space)
-            latent_means.append(latent_mean)
-            latent_log_vars.append(latent_log_var)
+            private_latent_log_var = Dense(latent_dims[i], activation=None, name='enc_log_var_{}'.format(i))(features_i)
 
-        self.encoder_inference_model = Model(inputs=inputs, outputs=outputs, name='encoder_inference')
+            inputs.append(data_input)
+            latent_means.append(private_latent_mean)
+            latent_log_vars.append(private_latent_log_var)
+            features.append(features_i)
+
+        features = Concatenate(axis=-1, name='enc_concat_all_features')(features)
+
+        shared_latent_mean = Dense(latent_dims[-1], activation=None, name='enc_shared_mean')(features)
+        shared_latent_log_var = Dense(latent_dims[-1], activation=None, name='enc_shared_log_var')(features)
+        total_latent_mean = Concatenate(axis=-1, name='enc_total_mean')(latent_means + [shared_latent_mean])
+        total_latent_log_var = Concatenate(axis=-1, name='enc_total_log_var')(latent_log_vars + [shared_latent_log_var])
+
+        # introduce the noise and reparametrise it
+        standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler_{}'.format(i))
+        standard_normal_sampler.arguments = {'data_dim': data_dims[i], 'noise_dim': latent_dims[i],
+                                             'seed': config['seed']}
+        noise = standard_normal_sampler(total_latent_mean)
+
+        total_latent_space = Lambda(lin_transform_standard_gaussian,
+                                    name='enc_latent')([total_latent_mean, total_latent_log_var, noise])
+
+        self.encoder_inference_model = Model(inputs=inputs, outputs=total_latent_space, name='encoder_inference')
         self.encoder_learning_model = Model(inputs=inputs,
-                                            outputs=[outputs, latent_means, latent_log_vars],
+                                            outputs=[total_latent_space, total_latent_mean, total_latent_log_var],
                                             name='encoder_learning')
 
     def __call__(self, *args, **kwargs):
@@ -353,7 +361,7 @@ class ReparametrisedGaussianConjointEncoder(object):
             is_learning: bool, whether the model is used in training or testing
 
         Returns:
-            The output of the model called on the input tensor
+            The output of the model called on the input tensor (total, i.e. private and shared latent space)
         """
         is_learning = kwargs.get('is_learning', True)
         if is_learning:
