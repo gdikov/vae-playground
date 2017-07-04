@@ -14,7 +14,7 @@ class BaseDecoder(object):
     def __init__(self, latent_dim, data_dim, network_architecture='synthetic', name='decoder'):
         logger.info("Initialising {} model with {}-dimensional data "
                     "and {}-dimensional latent input.".format(name, data_dim, latent_dim))
-        self.name = name
+        self.name = '_'.join(name.lower().split())
         self.data_dim = data_dim
         self.latent_dim = latent_dim
         self.network_architecture = network_architecture
@@ -45,36 +45,40 @@ class StandardDecoder(BaseDecoder):
     Note that the reconstruction loss is not used when the model training ends. It serves only the purpose to 
     define a measure of loss which is optimised. 
     """
-    def __init__(self, latent_dim, data_dim, network_architecture='synthetic'):
+    def __init__(self, latent_dim, data_dim, network_architecture='synthetic', name=None):
         """
         Args:
             latent_dim: int, the flattened dimensionality of the latent space 
             data_dim: int, the flattened dimensionality of the output space (data space)
             network_architecture: str, the architecture name for the body of the StandardDecoder model
+            name: str, identifier of the model
         """
         super(StandardDecoder, self).__init__(latent_dim=latent_dim, data_dim=data_dim,
                                               network_architecture=network_architecture,
-                                              name='Standard Decoder')
+                                              name=name or 'Standard Decoder')
 
-        generator_body = get_network_by_name['decoder'][network_architecture](self.latent_input)
+        generator_body = get_network_by_name['decoder'][network_architecture](self.latent_input, name_prefix=self.name)
 
         # NOTE: all decoder layers have names prefixed by `dec`.
         # This is essential for the partial model freezing during training.
-        sampler_params = Dense(self.data_dim, activation='sigmoid', name='dec_sampler_params')(generator_body)
+        sampler_params = Dense(self.data_dim, activation='sigmoid',
+                               name=self.name + 'dec_sampler_params')(generator_body)
 
         # a probability clipping is necessary for the Bernoulli `log_prob` property produces NaNs in the border cases.
-        sampler_params = Lambda(lambda x: 1e-6 + (1 - 2e-6) * x, name='dec_probs_clipper')(sampler_params)
+        sampler_params = Lambda(lambda x: 1e-6 + (1 - 2e-6) * x,
+                                name=self.name + 'dec_probs_clipper')(sampler_params)
 
         def bernoulli_log_probs(args):
             from tensorflow.contrib.distributions import Bernoulli
             mu, x = args
-            log_px = Bernoulli(probs=mu, name='dec_bernoulli').log_prob(x)
+            log_px = Bernoulli(probs=mu, name=self.name + 'dec_bernoulli').log_prob(x)
             return log_px
 
-        log_probs = Lambda(bernoulli_log_probs, name='dec_bernoulli_logprob')([sampler_params, self.data_input])
+        log_probs = Lambda(bernoulli_log_probs, name=self.name + 'dec_bernoulli_logprob')([sampler_params, self.data_input])
 
-        self.generator = Model(inputs=self.latent_input, outputs=sampler_params, name='dec_sampling')
-        self.ll_estimator = Model(inputs=[self.data_input, self.latent_input], outputs=log_probs, name='dec_trainable')
+        self.generator = Model(inputs=self.latent_input, outputs=sampler_params, name=self.name + 'dec_sampling')
+        self.ll_estimator = Model(inputs=[self.data_input, self.latent_input], outputs=log_probs,
+                                  name=self.name + 'dec_trainable')
 
     def __call__(self, *args, **kwargs):
         """

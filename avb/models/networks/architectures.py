@@ -87,11 +87,11 @@ def synthetic_encoder(data_dim, noise_dim, latent_dim=2):
     return latent_model
 
 
-def synthetic_reparametrized_encoder(inputs, latent_dim):
-    encoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix='rep_enc_body')
-    latent_mean = Dense(latent_dim, activation=None, name='rep_enc_mean')(encoder_body)
+def synthetic_reparametrized_encoder(inputs, latent_dim, name_prefix=''):
+    encoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix=name_prefix + 'rep_enc_body')
+    latent_mean = Dense(latent_dim, activation=None, name=name_prefix + 'rep_enc_mean')(encoder_body)
     # since the variance must be positive and this is not easy to restrict, interpret it in the log domain
-    latent_log_var = Dense(latent_dim, activation=None, name='rep_enc_var')(encoder_body)
+    latent_log_var = Dense(latent_dim, activation=None, name=name_prefix + 'rep_enc_var')(encoder_body)
     return latent_mean, latent_log_var
 
 
@@ -131,8 +131,8 @@ def synthetic_moment_estimation_encoder(data_dim, noise_dim, noise_basis_dim, la
     return coefficients_model, noise_basis_vectors_model
 
 
-def synthetic_decoder(inputs):
-    decoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix='dec_body')
+def synthetic_decoder(inputs, name_prefix=''):
+    decoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix=name_prefix + 'dec_body')
     return decoder_body
 
 
