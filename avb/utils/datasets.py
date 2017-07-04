@@ -227,3 +227,22 @@ def load_npoints(n=4):
         A dict with keys `data` and `target` containing the data points and a fictitious label (completely unnecessary)
     """
     return {'data': np.repeat(np.eye(n), 1, axis=0), 'target': np.repeat(np.arange(n), 1, axis=0)}
+
+
+def load_siamese_test(set=0):
+    '''
+    Load a simple test set for the siamese encocder - decoder
+    There are two sets available set=0 and set=1. They code for the two sets which share a latent representation (the
+    place where the value of the field is 0. The other numbers are between 0 and 1 - following a different distribution.
+    Gaussian 0.2 around 0.5 or uniform distribution between 0 and 1.
+    '''
+    if set == 0:
+        fields = 0.2 * np.random.randn(8, 4) + 0.5
+        fields = np.clip(fields, 0, 1)
+    else:
+        fields = np.random.uniform(0, 1, [8, 4])
+    fields -= (5 * np.repeat(np.eye(4), 2, axis=0))
+    fields = np.clip(fields, 0, 1)
+    labels = np.repeat(np.eye(4), 2, axis=0)
+
+    return {'data': fields, 'target': labels}
