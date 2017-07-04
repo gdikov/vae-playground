@@ -21,7 +21,7 @@ class BaseEncoder(object):
     def __init__(self, data_dim, noise_dim, latent_dim, network_architecture='synthetic', name='encoder'):
         logger.info("Initialising {} model with {}-dimensional data and {}-dimensional noise input "
                     "and {} dimensional latent output".format(name, data_dim, noise_dim, latent_dim))
-        self.name = name
+        self.name = '_'.join(name.lower().split())
         self.data_dim = data_dim
         self.noise_dim = noise_dim
         self.latent_dim = latent_dim
@@ -215,22 +215,24 @@ class ReparametrisedGaussianEncoder(BaseEncoder):
 
     """
 
-    def __init__(self, data_dim, noise_dim, latent_dim, network_architecture='synthetic'):
+    def __init__(self, data_dim, noise_dim, latent_dim, network_architecture='synthetic', name=None):
         """
         Args:
             data_dim: int, flattened data space dimensionality 
             noise_dim: int, flattened noise space dimensionality
             latent_dim: int, flattened latent space dimensionality
             network_architecture: str, the architecture name for the body of the reparametrised Gaussian Encoder model
+            name: str, optional identifier of the model
         """
         super(ReparametrisedGaussianEncoder, self).__init__(data_dim=data_dim,
                                                             noise_dim=noise_dim,
                                                             latent_dim=latent_dim,
                                                             network_architecture=network_architecture,
-                                                            name='Reparametrised Gaussian Encoder')
+                                                            name=name or 'Reparametrised Gaussian Encoder')
 
+        # FIXME: change names to be unique
         latent_mean, latent_log_var = get_network_by_name['reparametrised_encoder'][network_architecture](
-            self.data_input, latent_dim)
+            self.data_input, latent_dim, name_prefix=self.name)
 
         noise = self.standard_normal_sampler(self.data_input)
 
@@ -243,12 +245,13 @@ class ReparametrisedGaussianEncoder(BaseEncoder):
             return transformed_z
 
         latent_factors = Lambda(lin_transform_standard_gaussian,
-                                name='enc_reparametrised_latent')([latent_mean, latent_log_var, noise])
+                                name=self.name + 'enc_reparametrised_latent')([latent_mean, latent_log_var, noise])
 
-        self.encoder_inference_model = Model(inputs=self.data_input, outputs=latent_factors, name='encoder_inference')
+        self.encoder_inference_model = Model(inputs=self.data_input, outputs=latent_factors,
+                                             name=self.name + 'encoder_inference')
         self.encoder_learning_model = Model(inputs=self.data_input,
                                             outputs=[latent_factors, latent_mean, latent_log_var],
-                                            name='encoder_learning')
+                                            name=self.name + 'encoder_learning')
 
     def __call__(self, *args, **kwargs):
         """

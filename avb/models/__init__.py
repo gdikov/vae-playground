@@ -1,4 +1,4 @@
 from .base_vae import BaseVariationalAutoencoder
-from .gaussian_vae import GaussianVariationalAutoencoder
+from .gaussian_vae import GaussianVariationalAutoencoder, ConjointGaussianVariationalAutoencoder
 from .avb import AdversarialVariationalBayes
 from .freezable import FreezableModel

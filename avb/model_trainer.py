@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 from numpy import argmin, savez, asscalar
 
-from avb.models import AdversarialVariationalBayes, GaussianVariationalAutoencoder
+from avb.models import *
 from avb.utils.config import load_config
 
 config = load_config('global_config.yaml')
@@ -228,24 +228,28 @@ class VAEModelTrainer(ModelTrainer):
         return loss_hisotry
 
 
-class ConjointVAEModelTrainer(VAEModelTrainer):
+class ConjointVAEModelTrainer(ModelTrainer):
     """
     ModelTrainer class for the Conjoint Variational Autoencoder.
     """
 
-    def __init__(self, data_dim, latent_dim, experiment_name, overwrite=True,
+    def __init__(self, data_dims, latent_dims, experiment_name, overwrite=True,
                  optimiser_params=None, pretrained_dir=None):
         """
         Args:
-            data_dim: int, flattened data dimensionality
-            latent_dim: int, flattened latent dimensionality
+            data_dims: int, flattened data dimensionality
+            latent_dims: int, flattened latent dimensionality
             experiment_name: str, name of the training/experiment for logging purposes
             overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
             optimiser_params: dict, parameters for the optimiser
             pretrained_dir: str, optional path to the pre-trained model directory with the hdf5 and json files
         """
-        vae = GaussianVariationalAutoencoder(data_dim=data_dim, latent_dim=latent_dim,
-                                             experiment_architecture=experiment_name,
-                                             optimiser_params=optimiser_params,
-                                             resume_from=pretrained_dir)
-        super(VAEModelTrainer, self).__init__(model=vae, experiment_name=experiment_name, overwrite=overwrite)
+        conj_vae = ConjointGaussianVariationalAutoencoder(data_dims=data_dims, latent_dims=latent_dims,
+                                                          experiment_architecture=experiment_name,
+                                                          optimiser_params=optimiser_params,
+                                                          resume_from=pretrained_dir)
+        super(ConjointVAEModelTrainer, self).__init__(model=conj_vae, experiment_name=experiment_name,
+                                                      overwrite=overwrite)
+
+    def fit_model(self, data, batch_size, epochs):
+        raise NotImplementedError
