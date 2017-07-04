@@ -2,11 +2,16 @@ import gzip
 import logging
 import struct
 import scipy.io
-from skimage import color
-import urllib.request
 
 import numpy as np
 import os
+
+try:
+    from urllib.request import urlretrieve
+except ImportError:
+    # this works under Python 2
+    from urllib import urlretrieve
+from skimage import color
 
 from .config import load_config
 
@@ -15,6 +20,7 @@ config = load_config("global_config.yaml")
 
 PROJECT_DATA_DIR = config['data_dir']
 np.random.seed(config['seed'])
+
 
 def load_svhn(local_data_path=None, one_hot=True, grayscale=True):
     """
@@ -38,18 +44,17 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True):
     def convert_to_grayscale(raw_data):
         # converts the h x w x 3 images to h x w images with grayscale values
         # the conversion used is Y = 0.2125 R + 0.7154 G + 0.0721 B
-        gray_data = np.zeros([raw_data.shape[0], raw_data.shape[1], raw_data.shape[3]])
-        for i in range(raw_data.shape[-1]):
-            gray_data[:, :, i] = color.rgb2gray(raw_data[:, :, :, i])
+        gray_data = color.rgb2gray(raw_data)
         return gray_data
 
     svhn_path = os.path.join(PROJECT_DATA_DIR, "SVHN")
     if local_data_path is None and not os.path.exists(svhn_path):
         logger.info("Path to locally stored data not provided. Proceeding with downloading the SVHN dataset.")
         url = 'http://ufldl.stanford.edu/housenumbers/train_32x32.mat'
-        os.mkdir(svhn_path)
-        file_name = svhn_path + '/train_32x32.mat'
-        urllib.request.urlretrieve(url, file_name)
+        if not os.path.exists(svhn_path):
+            os.makedirs(svhn_path)
+        file_name = os.path.join(svhn_path, 'train_32x32.mat')
+        urlretrieve(url, file_name)
         svhn_imgs, svhn_labels = _load_svhn_from_file(svhn_path)
         if one_hot:
             svhn_labels = convert_to_one_hot(svhn_labels)
@@ -59,11 +64,12 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True):
         logger.info("Loading SVHN dataset from {}".format(local_data_path))
         if os.path.exists(local_data_path):
             svhn_imgs, svhn_labels = _load_svhn_from_file(local_data_path)
+            svhn_imgs = svhn_imgs.transpose((3, 0, 1, 2))
             if one_hot:
                 svhn_labels = convert_to_one_hot(svhn_labels)
             svhn = {'data': svhn_imgs, 'target': svhn_labels}
         else:
-            logger.error("Path to locally stored SVHN does not exist.")
+            logger.error("Path to locally stored SVHN dataset does not exist.")
             raise ValueError
 
     if grayscale:
@@ -84,13 +90,14 @@ def _load_svhn_from_file(data_dir=None):
     """
     # The files are assumed to have these names and should be found in 'path'
 
-    train_file = data_dir+'/train_32x32.mat'
+    train_file = os.path.join(data_dir, 'train_32x32.mat')
 
     train_dict = scipy.io.loadmat(train_file)
     images = np.asarray(train_dict['X'])
     labels = np.asarray(train_dict['y'])
     labels = labels.flatten()
-    labels[labels > 9] = 0
+    # labels mapping maps 1-9 digits to 1-9 label, however 0 has label 10 (for some reason), hence the reassignment.
+    labels[labels == 10] = 0
 
     return images, labels
 
