@@ -142,15 +142,15 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
         Returns:
             A training history dict.
         """
-        data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
+        data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training')
 
-        history = {'vae_loss': []}
+        history = {'conjoint_vae_loss': []}
         for _ in tqdm(range(epochs)):
             epoch_loss_history_vae = []
             for it in range(batches_per_epoch):
                 data_batch = next(data_iterator)
-                loss_autoencoder = self.vae_model.train_on_batch(data_batch[:-1], None)
+                loss_autoencoder = self.vae_model.train_on_batch(data_batch, None)
                 epoch_loss_history_vae.append(loss_autoencoder)
-            history['vae_loss'].append(epoch_loss_history_vae)
+            history['conjoint_vae_loss'].append(epoch_loss_history_vae)
 
         return history
