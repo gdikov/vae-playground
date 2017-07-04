@@ -252,4 +252,16 @@ class ConjointVAEModelTrainer(ModelTrainer):
                                                       overwrite=overwrite)
 
     def fit_model(self, data, batch_size, epochs):
-        raise NotImplementedError
+        """
+        Fit the Conjoint VAE model to multiple datasets.
+
+        Args:
+            data:
+            batch_size:
+            epochs:
+
+        Returns:
+
+        """
+        loss_hisotry = self.model.fit(data, batch_size, epochs=epochs)
+        return loss_hisotry
