@@ -2,11 +2,16 @@ import gzip
 import logging
 import struct
 import scipy.io
-from skimage import color
-import urllib.request
 
 import numpy as np
 import os
+
+try:
+    from urllib.request import urlretrieve
+except ImportError:
+    # this works under Python 2
+    from urllib import urlretrieve
+from skimage import color
 
 from .config import load_config
 
@@ -16,7 +21,61 @@ config = load_config("global_config.yaml")
 PROJECT_DATA_DIR = config['data_dir']
 np.random.seed(config['seed'])
 
-def load_svhn(local_data_path=None, one_hot=True, grayscale=True):
+
+def load_usps(local_data_path=None):
+    '''
+    Load the USPS dataset from local file or download it if not available.
+
+    :param local_data_path: path to the USPS dataset. Assumes unpacked files and original filenames.
+    :return: A dict with `data` and `target` keys with the USPS data  grayscale images.
+    '''
+
+    usps_path = os.path.join(PROJECT_DATA_DIR, "USPS")
+    if local_data_path is None and not os.path.exists(usps_path):
+        logger.info("Path to locally stored data not provided. Proceeding with downloading the USPS dataset.")
+        url = 'http://www.cs.nyu.edu/~roweis/data/usps_all.mat'
+        if not os.path.exists(usps_path):
+            os.makedirs(usps_path)
+        file_name = os.path.join(usps_path, 'usps_all.mat')
+        urlretrieve(url, file_name)
+        usps_imgs, usps_labels = _load_usps_from_file(usps_path)
+        usps = {'data': usps_imgs, 'target': usps_labels}
+    else:
+        local_data_path = local_data_path or usps_path
+        logger.info("Loading USPS dataset from {}".format(local_data_path))
+        if os.path.exists(local_data_path):
+            usps_imgs, usps_labels = _load_usps_from_file(local_data_path)
+            usps = {'data': usps_imgs, 'target': usps_labels}
+        else:
+            logger.error("Path to locally stored USPS dataset does not exist.")
+            raise ValueError
+
+    return usps
+
+
+def _load_usps_from_file(data_dir=None):
+    """
+    Load the binary files from disk.
+
+    Args:
+        data_dir: path to folder containing the USPS dataset blobs in a .mat file.
+
+    Returns:
+        A numpy array with the images and a numpy array with the corresponding labels.
+    """
+    # The files are assumed to have these names and should be found in 'path'
+
+    train_file = os.path.join(data_dir, 'usps_all.mat')
+
+    train_dict = scipy.io.loadmat(train_file)
+    images = train_dict['data']
+    images = np.reshape(images, [256, 1100*10])
+    labels = np.repeat(np.eye(10), 1100, axis=0)
+
+    return images, labels
+
+
+def load_svhn(local_data_path=None, one_hot=True, grayscale=True, extra_set=False):
     """
     Load the SVHN dataset from local file or download it if not available.
 
@@ -38,19 +97,21 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True):
     def convert_to_grayscale(raw_data):
         # converts the h x w x 3 images to h x w images with grayscale values
         # the conversion used is Y = 0.2125 R + 0.7154 G + 0.0721 B
-        gray_data = np.zeros([raw_data.shape[0], raw_data.shape[1], raw_data.shape[3]])
-        for i in range(raw_data.shape[-1]):
-            gray_data[:, :, i] = color.rgb2gray(raw_data[:, :, :, i])
+        gray_data = color.rgb2gray(raw_data)
         return gray_data
 
     svhn_path = os.path.join(PROJECT_DATA_DIR, "SVHN")
     if local_data_path is None and not os.path.exists(svhn_path):
         logger.info("Path to locally stored data not provided. Proceeding with downloading the SVHN dataset.")
         url = 'http://ufldl.stanford.edu/housenumbers/train_32x32.mat'
-        os.mkdir(svhn_path)
-        file_name = svhn_path + '/train_32x32.mat'
-        urllib.request.urlretrieve(url, file_name)
-        svhn_imgs, svhn_labels = _load_svhn_from_file(svhn_path)
+        if not os.path.exists(svhn_path):
+            os.makedirs(svhn_path)
+        file_name = os.path.join(svhn_path, 'train_32x32.mat')
+        urlretrieve(url, file_name)
+        file_name1 = os.path.join(svhn_path, 'extra_32x32.mat')
+        url1 = 'http://ufldl.stanford.edu/housenumbers/extra_32x32.mat'
+        urlretrieve(url1, file_name1)
+        svhn_imgs, svhn_labels = _load_svhn_from_file(svhn_path, extra_set)
         if one_hot:
             svhn_labels = convert_to_one_hot(svhn_labels)
         svhn = {'data': svhn_imgs, 'target': svhn_labels}
@@ -58,12 +119,13 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True):
         local_data_path = local_data_path or svhn_path
         logger.info("Loading SVHN dataset from {}".format(local_data_path))
         if os.path.exists(local_data_path):
-            svhn_imgs, svhn_labels = _load_svhn_from_file(local_data_path)
+            svhn_imgs, svhn_labels = _load_svhn_from_file(local_data_path, extra_set)
+            svhn_imgs = svhn_imgs.transpose((3, 0, 1, 2))
             if one_hot:
                 svhn_labels = convert_to_one_hot(svhn_labels)
             svhn = {'data': svhn_imgs, 'target': svhn_labels}
         else:
-            logger.error("Path to locally stored SVHN does not exist.")
+            logger.error("Path to locally stored SVHN dataset does not exist.")
             raise ValueError
 
     if grayscale:
@@ -72,7 +134,7 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True):
     return svhn
 
 
-def _load_svhn_from_file(data_dir=None):
+def _load_svhn_from_file(data_dir=None, extra_set=False):
     """
     Load the binary files from disk.
 
@@ -84,13 +146,23 @@ def _load_svhn_from_file(data_dir=None):
     """
     # The files are assumed to have these names and should be found in 'path'
 
-    train_file = data_dir+'/train_32x32.mat'
+    train_file = os.path.join(data_dir, 'train_32x32.mat')
+    extra_file = os.path.join(data_dir, 'extra_32x32.mat')
 
     train_dict = scipy.io.loadmat(train_file)
     images = np.asarray(train_dict['X'])
     labels = np.asarray(train_dict['y'])
+
+    if extra_set:
+        train_dict = scipy.io.loadmat(extra_file)
+        e_images = np.asarray(train_dict['X'])
+        e_labels = np.asarray(train_dict['y'])
+        images = np.concatenate((images, e_images), axis=0)
+        labels = np.concatenate((labels, e_labels), axis = 0)
+
     labels = labels.flatten()
-    labels[labels > 9] = 0
+    # labels mapping maps 1-9 digits to 1-9 label, however 0 has label 10 (for some reason), hence the reassignment.
+    labels[labels == 10] = 0
 
     return images, labels
 
