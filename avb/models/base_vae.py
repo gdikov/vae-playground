@@ -86,7 +86,13 @@ class BaseVariationalAutoencoder(object):
         if not hasattr(self, 'data_iterator'):
             raise AttributeError("Initialise the data iterator in the child classes first!")
         sampling_size = kwargs.get('sampling_size', 1)
-        data = np.repeat(data, sampling_size, axis=0)
+        if isinstance(data, tuple):
+            # assume data consists of multiple datasets and hence each of them has to be repeated
+            data = tuple([{'data': np.repeat(d['data'], sampling_size, axis=0),
+                           'target': np.repeat(d['target'], sampling_size, axis=0)} for d in data])
+        else:
+            data = np.repeat(data, sampling_size, axis=0)
+
         data_iterator, n_iters = self.data_iterator.iter(data, batch_size, mode='inference')
         latent_samples = self.inference_model.predict_generator(data_iterator, steps=n_iters)
         return latent_samples
