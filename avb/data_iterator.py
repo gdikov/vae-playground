@@ -138,7 +138,7 @@ class ConjointVAEDataIterator(DataIterator):
             raise NotImplementedError
 
     def iter_data_inference(self, data, n_batches, **kwargs):
-        raise NotImplementedError
+        return self.iter_data_training(data, n_batches, **kwargs)
 
     def iter_data_generation(self, data, n_batches, **kwargs):
         raise NotImplementedError
