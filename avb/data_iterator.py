@@ -70,4 +70,6 @@ class AVBDataIterator(DataIterator):
             for batch_indices in np.split(np.arange(data_size), n_batches):
                 yield data[batch_indices].astype(np.float32)
 
+
+
 VAEDataIterator = AVBDataIterator
