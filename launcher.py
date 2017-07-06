@@ -1,6 +1,6 @@
 from numpy import save as save_array
 from os.path import join as path_join
-from numpy import repeat
+from numpy import repeat, asarray
 from avb.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from avb.model_trainer import ConjointVAEModelTrainer
 from avb.utils.datasets import load_npoints
@@ -18,24 +18,26 @@ def run_synthetic_experiment():
     logger.info("Starting a conjoint model experiment on the synthetic dataset.")
     data_dims = (4, 4)
     latent_dims = (2, 2, 2)
-    data = load_npoints(n=data_dims[0])
+    data = load_npoints(n=data_dims, noisy=True)
+    # data = ({'data': asarray([[1, 0, 0, 0], [0, 1, 0, 0]]), 'target': asarray([0, 1])},
+    #         {'data': asarray([[1, 0.1, 0.2, 0.5], [0.01, 0.9, 0.02, 0.3]]), 'target': asarray([0, 1])})
 
     trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
                                       experiment_name='synthetic', overwrite=True,
-                                      optimiser_params={'lr': 0.001})
+                                      optimiser_params={'lr': 0.0001})
 
-    model_dir = trainer.run_training((data, data), batch_size=400, epochs=200)
+    model_dir = trainer.run_training(data, batch_size=400, epochs=400)
     trained_model = trainer.get_model()
 
     sampling_size = 400
 
-    latent_vars = trained_model.infer((data, data), batch_size=400, sampling_size=sampling_size)
+    latent_vars = trained_model.infer(data, batch_size=400, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
-    plot_latent_2d(latent_vars[:, -2:], repeat(data['target'], sampling_size),
+    plot_latent_2d(latent_vars[:, -2:], repeat(data[0]['target'], sampling_size),
                    fig_dirpath=model_dir, fig_name='shared.png')
-    plot_latent_2d(latent_vars[:, :2], repeat(data['target'], sampling_size),
+    plot_latent_2d(latent_vars[:, :2], repeat(data[0]['target'], sampling_size),
                    fig_dirpath=model_dir, fig_name='private_1.png')
-    plot_latent_2d(latent_vars[:, 2:4], repeat(data['target'], sampling_size),
+    plot_latent_2d(latent_vars[:, 2:4], repeat(data[0]['target'], sampling_size),
                    fig_dirpath=model_dir, fig_name='private_2.png')
 
     clear_session()

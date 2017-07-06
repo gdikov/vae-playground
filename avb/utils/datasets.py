@@ -222,34 +222,33 @@ def load_8schools():
     return {'effect': estimated_effects, 'stderr': std_errors}
 
 
-def load_npoints(n=4):
+def load_npoints(n=4, noisy=False, n_datasets=1):
     """
     Load a generalisation of the 4 points synthetic dataset as described in the Experiments section, Generative models, 
     Synthetic example in "Adversarial Variational Bayes, L. Mescheder et al., 2017". 
-    
+
     Args:
-        Number of distinct data points (i.e. dimensionality of the (vector) space in which they reside)
+        n: int, number of distinct data points (i.e. dimensionality of the (vector) space in which they reside)
+        noisy: bool, whether small Gaussian noise should be added to the dataset(s)
+        n_datasets: int, number of possibly different datasets to be generated
         
     Returns:
-        A dict with keys `data` and `target` containing the data points and a fictitious label (completely unnecessary)
+        A dict with keys `data` and `target` containing the data points and the corresponding labels or a list of
+        multiple such dataset dicts.
     """
-    return {'data': np.repeat(np.eye(n), 1, axis=0), 'target': np.repeat(np.arange(n), 1, axis=0)}
+    if isinstance(n, int):
+        n = tuple([n])
+    # else assume that it is a list or tuple of dimensionalities
+    datasets = []
+    for dim in n:
+        data = np.eye(dim)
+        if noisy:
+            data = data + 0.1 * np.random.standard_normal(data.shape)
+            data[np.eye(dim)] = 1.
+            data = np.clip(data, 0, 1)
+        datasets.append({'data': data, 'target': np.arange(dim)})
+    if len(datasets) == 1:
+        # unlist the result
+        return datasets[0]
 
-
-def load_siamese_test(set=0):
-    '''
-    Load a simple test set for the siamese encocder - decoder
-    There are two sets available set=0 and set=1. They code for the two sets which share a latent representation (the
-    place where the value of the field is 0. The other numbers are between 0 and 1 - following a different distribution.
-    Gaussian 0.2 around 0.5 or uniform distribution between 0 and 1.
-    '''
-    if set == 0:
-        fields = 0.2 * np.random.randn(8, 4) + 0.5
-        fields = np.clip(fields, 0, 1)
-    else:
-        fields = np.random.uniform(0, 1, [8, 4])
-    fields -= (5 * np.repeat(np.eye(4), 2, axis=0))
-    fields = np.clip(fields, 0, 1)
-    labels = np.repeat(np.eye(4), 2, axis=0)
-
-    return {'data': fields, 'target': labels}
+    return tuple(datasets)
