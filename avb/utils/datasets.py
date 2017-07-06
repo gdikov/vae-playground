@@ -222,7 +222,7 @@ def load_8schools():
     return {'effect': estimated_effects, 'stderr': std_errors}
 
 
-def load_npoints(n=4, noisy=False, n_datasets=1):
+def load_npoints(n=4, noisy=False):
     """
     Load a generalisation of the 4 points synthetic dataset as described in the Experiments section, Generative models, 
     Synthetic example in "Adversarial Variational Bayes, L. Mescheder et al., 2017". 
@@ -230,7 +230,6 @@ def load_npoints(n=4, noisy=False, n_datasets=1):
     Args:
         n: int, number of distinct data points (i.e. dimensionality of the (vector) space in which they reside)
         noisy: bool, whether small Gaussian noise should be added to the dataset(s)
-        n_datasets: int, number of possibly different datasets to be generated
         
     Returns:
         A dict with keys `data` and `target` containing the data points and the corresponding labels or a list of
@@ -244,7 +243,6 @@ def load_npoints(n=4, noisy=False, n_datasets=1):
         data = np.eye(dim)
         if noisy:
             data = data + 0.1 * np.random.standard_normal(data.shape)
-            data[np.eye(dim)] = 1.
             data = np.clip(data, 0, 1)
         datasets.append({'data': data, 'target': np.arange(dim)})
     if len(datasets) == 1:

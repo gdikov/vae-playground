@@ -61,6 +61,8 @@ def plot_latent_2d(latent_vars, target=None, fig_dirpath=None, fig_name=None):
 
     """
     fig_name = fig_name or 'latent_samples.png'
+    if not fig_name.endswith('.png'):
+        fig_name += '.png'
     logger.info("Plotting 2D latent space.")
     plt.figure(figsize=(6, 6))
     cmap = plt.get_cmap('viridis')
@@ -79,18 +81,22 @@ def plot_latent_2d(latent_vars, target=None, fig_dirpath=None, fig_name=None):
         plt.show()
 
 
-def plot_sampled_data(data, fig_dirpath=None):
+def plot_sampled_data(data, fig_dirpath=None, fig_name=None):
     """
     Plot the generated samples in a large square plot of the concatenated generated images.
 
     Args:
         data: ndarray, the generated samples with shape (N, data_dim)
         fig_dirpath: str, optional path to folder where the figure will be saved and not showed
+        fig_name: str, optional name of the plot figure
 
     Returns:
 
     """
     logger.info("Plotting sampled data.")
+    fig_name = fig_name or 'generated_samples.png'
+    if not fig_name.endswith('.png'):
+        fig_name += '.png'
     data_dim = data.shape[1]
     sample_side_size = int(np.sqrt(data_dim))
     data = data.reshape(-1, sample_side_size, sample_side_size)
@@ -104,7 +110,7 @@ def plot_sampled_data(data, fig_dirpath=None):
     if fig_dirpath is not None:
         if not os.path.exists(fig_dirpath):
             os.makedirs(fig_dirpath)
-        plt.savefig(os.path.join(fig_dirpath, 'generated_samples.png'))
+        plt.savefig(os.path.join(fig_dirpath, fig_name))
     else:
         plt.show()
 

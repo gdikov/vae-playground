@@ -40,7 +40,7 @@ class DataIterator(object):
                 altered_data = np.concatenate([data, data[additional_samples_indices]], axis=0)
         else:
             altered_data = data
-        n_batches = altered_data['data'].shape[0] // batch_size
+        n_batches = (data_size + additional_samples) // batch_size
         return altered_data, n_batches
 
     def iter_data_inference(self, data, n_batches, **kwargs):
@@ -147,4 +147,7 @@ class ConjointVAEDataIterator(DataIterator):
         return self.iter_data_training(data, n_batches, **kwargs)
 
     def iter_data_generation(self, data, n_batches, **kwargs):
-        raise NotImplementedError
+        data_size = data.shape[0]
+        while True:
+            for batch_indices in np.split(np.arange(data_size), n_batches):
+                yield data[batch_indices].astype(np.float32)

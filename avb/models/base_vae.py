@@ -45,9 +45,7 @@ class BaseVariationalAutoencoder(object):
         if isinstance(latent_dim, int):
             self.latent_input = Input(shape=(latent_dim,), name='{}_latent_prior_input'.format(name_prefix))
         elif isinstance(latent_dim, (tuple, list)):
-            raise NotImplementedError("Latent dimension should be a single concatenated tensor.")
-            # self.latent_input = [Input(shape=(d,), name='{}_latent_prior_input_{}'.format(name_prefix, i))
-            #                      for i, d in enumerate(latent_dim)]
+            raise NotImplementedError("Latent factors should be a single concatenated tensor.")
         self.generative_model = Model(inputs=self.latent_input,
                                       outputs=self.decoder(self.latent_input, is_learning=False))
 
