@@ -74,7 +74,8 @@ class StandardDecoder(BaseDecoder):
             log_px = Bernoulli(probs=mu, name=self.name + 'dec_bernoulli').log_prob(x)
             return log_px
 
-        log_probs = Lambda(bernoulli_log_probs, name=self.name + 'dec_bernoulli_logprob')([sampler_params, self.data_input])
+        log_probs = Lambda(bernoulli_log_probs, name=self.name + 'dec_bernoulli_logprob')([sampler_params,
+                                                                                           self.data_input])
 
         self.generator = Model(inputs=self.latent_input, outputs=sampler_params, name=self.name + 'dec_sampling')
         self.ll_estimator = Model(inputs=[self.data_input, self.latent_input], outputs=log_probs,
@@ -142,16 +143,22 @@ class ConjointDecoder(object):
         latent_input = Input(shape=(sum(latent_dims),), name='dec_latent_input')
 
         # evt. set the output_shape arg.
-        shared_latent_factors = Lambda(lambda x: x[0][:, -x[1]:])([latent_input, latent_dims[-1]])
+        def slice_latent(x, start=0, stop=None):
+            if stop is None:
+                return x[:, start:]
+            else:
+                return x[:, start:stop]
+        shared_latent_factors = Lambda(slice_latent, arguments={'start': -latent_dims[-1], 'stop': None})(latent_input)
 
         sampling_outputs, log_probs = [], []
         stop_id = 0
         for i in range(len(data_dims)):
             start_id = stop_id
             stop_id += latent_dims[i]
-            latent_i = Lambda(lambda x: x[0][:, x[1]:x[2]])([latent_input, start_id, stop_id])
+            latent_i = Lambda(slice_latent, arguments={'start': start_id, 'stop': stop_id})(latent_input)
             latent_i = Concatenate(axis=-1, name='dec_merged_latent_{}'.format(i))([latent_i, shared_latent_factors])
-            generator_body = get_network_by_name['decoder'][network_architecture](latent_i)
+            generator_body = get_network_by_name['conjoint_decoder'][network_architecture](latent_i,
+                                                                                           'conj_{}'.format(i))
             sampler_params = Dense(data_dims[i], activation='sigmoid',
                                    name='dec_sampler_params_{}'.format(i))(generator_body)
             # probability clipping is necessary for the Bernoulli `log_prob` property produces NaNs in the limit cases
@@ -161,6 +168,8 @@ class ConjointDecoder(object):
                               name='dec_bernoulli_logprob_{}'.format(i))([sampler_params, data_inputs[i]])
             sampling_outputs.append(sampler_params)
             log_probs.append(log_prob)
+
+        log_probs = Concatenate(axis=-1, name='dec_conc_log_probs')(log_probs)
 
         self.generator = Model(inputs=latent_input, outputs=sampling_outputs, name='dec_sampling')
         self.ll_estimator = Model(inputs=data_inputs + [latent_input], outputs=log_probs, name='dec_trainable')

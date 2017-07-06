@@ -24,14 +24,19 @@ def run_synthetic_experiment():
                                       experiment_name='synthetic', overwrite=True,
                                       optimiser_params={'lr': 0.001})
 
-    model_dir = trainer.run_training((data, data), batch_size=400, epochs=20)
+    model_dir = trainer.run_training((data, data), batch_size=400, epochs=200)
     trained_model = trainer.get_model()
 
     sampling_size = 400
 
     latent_vars = trained_model.infer((data, data), batch_size=400, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
-    plot_latent_2d(latent_vars[:, -2:], data['target'], fig_dirpath=model_dir)
+    plot_latent_2d(latent_vars[:, -2:], repeat(data['target'], sampling_size),
+                   fig_dirpath=model_dir, fig_name='shared.png')
+    plot_latent_2d(latent_vars[:, :2], repeat(data['target'], sampling_size),
+                   fig_dirpath=model_dir, fig_name='private_1.png')
+    plot_latent_2d(latent_vars[:, 2:4], repeat(data['target'], sampling_size),
+                   fig_dirpath=model_dir, fig_name='private_2.png')
 
     clear_session()
     return model_dir

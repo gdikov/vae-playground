@@ -95,6 +95,11 @@ def synthetic_reparametrized_encoder(inputs, latent_dim, name_prefix=''):
     return latent_mean, latent_log_var
 
 
+def synthetic_conjoint_encoder(inputs, name_prefix=''):
+    encoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix=name_prefix + '_enc_body')
+    return encoder_body
+
+
 def synthetic_moment_estimation_encoder(data_dim, noise_dim, noise_basis_dim, latent_dim=2):
     noise_input = Input(shape=(noise_basis_dim, noise_dim,), name='enc_internal_noise_input')
 
@@ -351,11 +356,15 @@ get_network_by_name = {'encoder': {'synthetic': synthetic_encoder,
                        'reparametrised_encoder': {'synthetic': synthetic_reparametrized_encoder,
                                                   'mnist': mnist_reparametrized_encoder,
                                                   'mnist_simple': mnist_reparametrized_encoder_simple},
+                       'conjoint_encoder': {'synthetic': synthetic_conjoint_encoder},
                        'moment_estimation_encoder': {'synthetic': synthetic_moment_estimation_encoder,
                                                      'mnist': mnist_moment_estimation_encoder},
+
                        'decoder': {'synthetic': synthetic_decoder,
                                    'mnist': mnist_decoder,
                                    'mnist_simple': mnist_decoder_simple},
+                       'conjoint_decoder': {'synthetic': synthetic_decoder},
+
                        'discriminator': {'synthetic': synthetic_discriminator,
                                          'mnist': mnist_discriminator_simple,
                                          'mnist_simple': mnist_discriminator_simple},

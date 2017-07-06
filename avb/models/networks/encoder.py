@@ -320,8 +320,8 @@ class ReparametrisedGaussianConjointEncoder(object):
 
         inputs, latent_space, latent_means, latent_log_vars, features = [], [], [], [], []
         for i in range(len(data_dims)):
-            data_input = Input(shape=(data_dims[i]), name="enc_data_input_{}".format(i))
-            features_i = get_network_by_name['conjoint_encoder'][network_architecture](data_input)
+            data_input = Input(shape=(data_dims[i],), name="enc_data_input_{}".format(i))
+            features_i = get_network_by_name['conjoint_encoder'][network_architecture](data_input, 'conj_{}'.format(i))
             private_latent_mean = Dense(latent_dims[i], activation=None, name='enc_mean_{}'.format(i))(features_i)
             # since the variance must be positive and this is not easy to restrict, take it in the log domain
             # and exponentiate it during the reparametrisation
@@ -340,8 +340,9 @@ class ReparametrisedGaussianConjointEncoder(object):
         total_latent_log_var = Concatenate(axis=-1, name='enc_total_log_var')(latent_log_vars + [shared_latent_log_var])
 
         # introduce the noise and reparametrise it
-        standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler_{}'.format(i))
-        standard_normal_sampler.arguments = {'data_dim': data_dims[i], 'noise_dim': latent_dims[i],
+        standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler')
+        standard_normal_sampler.arguments = {'data_dim': sum(data_dims),
+                                             'noise_dim': sum(latent_dims),
                                              'seed': config['seed']}
         noise = standard_normal_sampler(total_latent_mean)
 
