@@ -106,7 +106,7 @@ class ConjointVAEDataIterator(DataIterator):
 
     def iter_data_training(self, data, n_batches, **kwargs):
         group_by_target = kwargs.get('group_by_target', True)
-
+        shuffle = kwargs.get('shuffle', True)
         unique_labels = np.unique(data[0]['target'])
         if not (all([len(d['data']) == len(d['target']) for d in data])
                 and all([len(d['data']) == len(data[0]['data']) for d in data[1:]])
@@ -126,18 +126,24 @@ class ConjointVAEDataIterator(DataIterator):
                 count_uniques = np.diff(np.nonzero(first_uniques)[0])
                 indices_groups.append(np.split(sorted_indices, np.cumsum(count_uniques)))
             while True:
-                for _ in range(n_batches):
-                    # sample batch_size many samples from each dataset such that the labels are the same
-                    random_groups = np.random.randint(low=0, high=unique_labels.size, size=batch_size)
-                    sample_ids = np.squeeze([[np.random.choice(dataset_groups[random_group_id], size=1)
-                                             for dataset_groups in indices_groups]
-                                             for random_group_id in random_groups]).T
+                for i in range(n_batches):
+                    if shuffle:
+                        # sample batch_size many samples from each dataset such that the labels are the same
+                        random_groups = np.random.randint(low=0, high=unique_labels.size, size=batch_size)
+                        sample_ids = np.squeeze([[np.random.choice(dataset_groups[random_group_id], size=1)
+                                                 for dataset_groups in indices_groups]
+                                                 for random_group_id in random_groups]).T
+                    else:
+                        sample_ids = np.squeeze([np.random.choice(dataset_groups[i % len(unique_labels)],
+                                                                  size=batch_size)
+                                                 for dataset_groups in indices_groups])
                     batch = [data[i]['data'][ids].astype(np.float32) for i, ids in enumerate(sample_ids)]
                     yield batch
         else:
             raise NotImplementedError
 
     def iter_data_inference(self, data, n_batches, **kwargs):
+        kwargs['shuffle'] = False
         return self.iter_data_training(data, n_batches, **kwargs)
 
     def iter_data_generation(self, data, n_batches, **kwargs):
