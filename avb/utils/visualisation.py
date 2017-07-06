@@ -47,7 +47,7 @@ def _colorbar_index(ncolors, cmap):
     colorbar.set_ticklabels(range(ncolors))
 
 
-def plot_latent_2d(latent_vars, target=None, fig_dirpath=None):
+def plot_latent_2d(latent_vars, target=None, fig_dirpath=None, fig_name=None):
     """
     Plot in 2D samples from the latent space.
 
@@ -55,10 +55,12 @@ def plot_latent_2d(latent_vars, target=None, fig_dirpath=None):
         latent_vars: ndarray, the latent samples with shape (N, 2)
         target: ndarray, the numeric labels used for coloring of the latent samples, shape is (N, 1)
         fig_dirpath: str, optional path to folder where the figure will be saved and not showed
+        fig_name: str, optional name of the plot figure
 
     Returns:
 
     """
+    fig_name = fig_name or 'latent_samples.png'
     logger.info("Plotting 2D latent space.")
     plt.figure(figsize=(6, 6))
     cmap = plt.get_cmap('viridis')
@@ -72,7 +74,7 @@ def plot_latent_2d(latent_vars, target=None, fig_dirpath=None):
     if fig_dirpath is not None:
         if not os.path.exists(fig_dirpath):
             os.makedirs(fig_dirpath)
-        plt.savefig(os.path.join(fig_dirpath, 'latent_samples.png'))
+        plt.savefig(os.path.join(fig_dirpath, fig_name))
     else:
         plt.show()
 

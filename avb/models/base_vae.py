@@ -36,24 +36,20 @@ class BaseVariationalAutoencoder(object):
 
         if isinstance(data_dim, int):
             self.data_input = Input(shape=(data_dim,), name='{}_data_input'.format(name_prefix))
-            self.inference_model = Model(inputs=self.data_input,
-                                         outputs=self.encoder(self.data_input, is_learning=False))
         elif isinstance(data_dim, (tuple, list)):
             self.data_input = [Input(shape=(d,), name='{}_data_input_{}'.format(name_prefix, i))
                                for i, d in enumerate(data_dim)]
-            self.inference_model = Model(inputs=self.data_input,
-                                         outputs=[self.encoder[i](self.data_input[i], is_learning=False)
-                                                  for i, d in enumerate(data_dim)])
+        self.inference_model = Model(inputs=self.data_input,
+                                     outputs=self.encoder(self.data_input, is_learning=False))
+
         if isinstance(latent_dim, int):
             self.latent_input = Input(shape=(latent_dim,), name='{}_latent_prior_input'.format(name_prefix))
-            self.generative_model = Model(inputs=self.latent_input,
-                                          outputs=self.decoder(self.latent_input, is_learning=False))
         elif isinstance(latent_dim, (tuple, list)):
-            self.latent_input = [Input(shape=(d,), name='{}_latent_prior_input_{}'.format(name_prefix, i))
-                                 for i, d in enumerate(latent_dim)]
-            self.generative_model = Model(inputs=self.latent_input,
-                                          outputs=[self.decoder[i](self.latent_input[i], is_learning=False)
-                                                   for i, d in enumerate(latent_dim)])
+            raise NotImplementedError("Latent dimension should be a single concatenated tensor.")
+            # self.latent_input = [Input(shape=(d,), name='{}_latent_prior_input_{}'.format(name_prefix, i))
+            #                      for i, d in enumerate(latent_dim)]
+        self.generative_model = Model(inputs=self.latent_input,
+                                      outputs=self.decoder(self.latent_input, is_learning=False))
 
     def fit(self, data, batch_size=32, epochs=1, **kwargs):
         """
