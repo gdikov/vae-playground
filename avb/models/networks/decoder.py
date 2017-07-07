@@ -148,14 +148,16 @@ class ConjointDecoder(object):
                 return x[:, start:]
             else:
                 return x[:, start:stop]
-        shared_latent_factors = Lambda(slice_latent, arguments={'start': -latent_dims[-1], 'stop': None})(latent_input)
+        shared_latent_factors = Lambda(slice_latent, arguments={'start': -latent_dims[-1], 'stop': None},
+                                       name='dec_slice_shared_lat')(latent_input)
 
         sampling_outputs, log_probs = [], []
         stop_id = 0
         for i in range(len(data_dims)):
             start_id = stop_id
             stop_id += latent_dims[i]
-            latent_i = Lambda(slice_latent, arguments={'start': start_id, 'stop': stop_id})(latent_input)
+            latent_i = Lambda(slice_latent, arguments={'start': start_id, 'stop': stop_id},
+                              name='dec_slice_{}'.format(i))(latent_input)
             latent_i = Concatenate(axis=-1, name='dec_merged_latent_{}'.format(i))([latent_i, shared_latent_factors])
             generator_body = get_network_by_name['conjoint_decoder'][network_architecture](latent_i,
                                                                                            'conj_{}'.format(i))
