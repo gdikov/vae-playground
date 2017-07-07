@@ -26,7 +26,7 @@ def run_synthetic_experiment():
                                       experiment_name='synthetic', overwrite=True,
                                       optimiser_params={'lr': 0.0001})
 
-    model_dir = trainer.run_training(data, batch_size=400, epochs=600)
+    model_dir = trainer.run_training(data, batch_size=400, epochs=1000)
     trained_model = trainer.get_model()
 
     sampling_size = 400
@@ -41,6 +41,12 @@ def run_synthetic_experiment():
         stop_id += lat_id
         plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(data[0]['target'], sampling_size),
                        fig_dirpath=model_dir, fig_name='private_{}'.format(i))
+
+    reconstructions = trained_model.reconstruct(data, batch_size=4, sampling_size=1)
+    save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
+    for i, rec in enumerate(reconstructions):
+        plot_reconstructed_data(data[i]['data'], rec[0],
+                                fig_dirpath=model_dir, fig_name='reconstructed_{}'.format(i))
 
     generations = trained_model.generate(n_samples=100, batch_size=100)
     save_array(path_join(model_dir, 'generated_samples.npy'), generations)
