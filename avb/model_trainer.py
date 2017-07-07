@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 from numpy import argmin, savez, asscalar
 
-from avb.models import AdversarialVariationalBayes, GaussianVariationalAutoencoder
+from avb.models import *
 from avb.utils.config import load_config
 
 config = load_config('global_config.yaml')
@@ -141,7 +141,7 @@ class ModelTrainer(object):
 
 class AVBModelTrainer(ModelTrainer):
     """
-    ModelTrainer instance for the AVBModel.
+    ModelTrainer class for the AVBModel.
     """
     def __init__(self, data_dim, latent_dim, noise_dim, experiment_name, schedule=None,
                  pretrained_dir=None, overwrite=True, use_adaptive_contrast=False,
@@ -190,7 +190,7 @@ class AVBModelTrainer(ModelTrainer):
 
 class VAEModelTrainer(ModelTrainer):
     """
-    ModelTrainer instance for the GaussianVariationalAutoencoder (as per [TODO: add citation to Kingma, Welling]).
+    ModelTrainer class for the GaussianVariationalAutoencoder (as per [TODO: add citation to Kingma, Welling]).
     """
 
     def __init__(self, data_dim, latent_dim, experiment_name, overwrite=True,
@@ -223,6 +223,45 @@ class VAEModelTrainer(ModelTrainer):
 
         Returns:
             A loss history dict with the encoder-decoder loss.
+        """
+        loss_hisotry = self.model.fit(data, batch_size, epochs=epochs)
+        return loss_hisotry
+
+
+class ConjointVAEModelTrainer(ModelTrainer):
+    """
+    ModelTrainer class for the Conjoint Variational Autoencoder.
+    """
+
+    def __init__(self, data_dims, latent_dims, experiment_name, overwrite=True,
+                 optimiser_params=None, pretrained_dir=None):
+        """
+        Args:
+            data_dims: int, flattened data dimensionality
+            latent_dims: int, flattened latent dimensionality
+            experiment_name: str, name of the training/experiment for logging purposes
+            overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
+            optimiser_params: dict, parameters for the optimiser
+            pretrained_dir: str, optional path to the pre-trained model directory with the hdf5 and json files
+        """
+        conj_vae = ConjointGaussianVariationalAutoencoder(data_dims=data_dims, latent_dims=latent_dims,
+                                                          experiment_architecture=experiment_name,
+                                                          optimiser_params=optimiser_params,
+                                                          resume_from=pretrained_dir)
+        super(ConjointVAEModelTrainer, self).__init__(model=conj_vae, experiment_name=experiment_name,
+                                                      overwrite=overwrite)
+
+    def fit_model(self, data, batch_size, epochs):
+        """
+        Fit the Conjoint VAE model to multiple datasets.
+
+        Args:
+            data:
+            batch_size:
+            epochs:
+
+        Returns:
+
         """
         loss_hisotry = self.model.fit(data, batch_size, epochs=epochs)
         return loss_hisotry

@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from ..utils.config import load_config
 from .losses import AVBDiscriminatorLossLayer, AVBEncoderDecoderLossLayer
-from .networks import StandardEncoder, MomentEstimationEncoder, Decoder, Discriminator, AdaptivePriorDiscriminator
+from .networks import StandardEncoder, MomentEstimationEncoder, StandardDecoder, Discriminator, AdaptivePriorDiscriminator
 from ..data_iterator import AVBDataIterator
 from ..models.base_vae import BaseVariationalAutoencoder
 from ..models.freezable import FreezableModel
@@ -60,8 +60,8 @@ class AdversarialVariationalBayes(BaseVariationalAutoencoder):
                                            network_architecture=experiment_architecture)
             self.discriminator = Discriminator(data_dim=data_dim, latent_dim=latent_dim,
                                                network_architecture=experiment_architecture)
-        self.decoder = Decoder(latent_dim=latent_dim, data_dim=data_dim,
-                               network_architecture=experiment_architecture)
+        self.decoder = StandardDecoder(latent_dim=latent_dim, data_dim=data_dim,
+                                       network_architecture=experiment_architecture)
 
         super(AdversarialVariationalBayes, self).__init__(data_dim=data_dim, noise_dim=noise_dim,
                                                           latent_dim=latent_dim, name_prefix=self.name)

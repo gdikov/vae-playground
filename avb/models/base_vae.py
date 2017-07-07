@@ -34,12 +34,18 @@ class BaseVariationalAutoencoder(object):
         if not hasattr(self, 'encoder') and hasattr(self, 'decoder'):
             raise AttributeError("Initialise the attributes `encoder` and `decoder` in the child classes first!")
 
-        self.data_input = Input(shape=(data_dim,), name='{}_data_input'.format(name_prefix))
-        self.latent_input = Input(shape=(latent_dim,), name='{}_latent_prior_input'.format(name_prefix))
-
-        # define the testing models
+        if isinstance(data_dim, int):
+            self.data_input = Input(shape=(data_dim,), name='{}_data_input'.format(name_prefix))
+        elif isinstance(data_dim, (tuple, list)):
+            self.data_input = [Input(shape=(d,), name='{}_data_input_{}'.format(name_prefix, i))
+                               for i, d in enumerate(data_dim)]
         self.inference_model = Model(inputs=self.data_input,
                                      outputs=self.encoder(self.data_input, is_learning=False))
+
+        if isinstance(latent_dim, int):
+            self.latent_input = Input(shape=(latent_dim,), name='{}_latent_prior_input'.format(name_prefix))
+        elif isinstance(latent_dim, (tuple, list)):
+            raise NotImplementedError("Latent factors should be a single concatenated tensor.")
         self.generative_model = Model(inputs=self.latent_input,
                                       outputs=self.decoder(self.latent_input, is_learning=False))
 
@@ -74,7 +80,13 @@ class BaseVariationalAutoencoder(object):
         if not hasattr(self, 'data_iterator'):
             raise AttributeError("Initialise the data iterator in the child classes first!")
         sampling_size = kwargs.get('sampling_size', 1)
-        data = np.repeat(data, sampling_size, axis=0)
+        if isinstance(data, tuple):
+            # assume data consists of multiple datasets and hence each of them has to be repeated
+            data = tuple([{'data': np.repeat(d['data'], sampling_size, axis=0),
+                           'target': np.repeat(d['target'], sampling_size, axis=0)} for d in data])
+        else:
+            data = np.repeat(data, sampling_size, axis=0)
+
         data_iterator, n_iters = self.data_iterator.iter(data, batch_size, mode='inference')
         latent_samples = self.inference_model.predict_generator(data_iterator, steps=n_iters)
         return latent_samples

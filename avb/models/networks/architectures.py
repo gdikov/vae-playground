@@ -87,12 +87,17 @@ def synthetic_encoder(data_dim, noise_dim, latent_dim=2):
     return latent_model
 
 
-def synthetic_reparametrized_encoder(inputs, latent_dim):
-    encoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix='rep_enc_body')
-    latent_mean = Dense(latent_dim, activation=None, name='rep_enc_mean')(encoder_body)
+def synthetic_reparametrized_encoder(inputs, latent_dim, name_prefix=''):
+    encoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix=name_prefix + 'rep_enc_body')
+    latent_mean = Dense(latent_dim, activation=None, name=name_prefix + 'rep_enc_mean')(encoder_body)
     # since the variance must be positive and this is not easy to restrict, interpret it in the log domain
-    latent_log_var = Dense(latent_dim, activation=None, name='rep_enc_var')(encoder_body)
+    latent_log_var = Dense(latent_dim, activation=None, name=name_prefix + 'rep_enc_var')(encoder_body)
     return latent_mean, latent_log_var
+
+
+def synthetic_conjoint_encoder(inputs, name_prefix=''):
+    encoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix=name_prefix + '_enc_body')
+    return encoder_body
 
 
 def synthetic_moment_estimation_encoder(data_dim, noise_dim, noise_basis_dim, latent_dim=2):
@@ -131,8 +136,8 @@ def synthetic_moment_estimation_encoder(data_dim, noise_dim, noise_basis_dim, la
     return coefficients_model, noise_basis_vectors_model
 
 
-def synthetic_decoder(inputs):
-    decoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix='dec_body')
+def synthetic_decoder(inputs, name_prefix=''):
+    decoder_body = repeat_dense(inputs, n_layers=2, n_units=256, name_prefix=name_prefix + 'dec_body')
     return decoder_body
 
 
@@ -351,11 +356,15 @@ get_network_by_name = {'encoder': {'synthetic': synthetic_encoder,
                        'reparametrised_encoder': {'synthetic': synthetic_reparametrized_encoder,
                                                   'mnist': mnist_reparametrized_encoder,
                                                   'mnist_simple': mnist_reparametrized_encoder_simple},
+                       'conjoint_encoder': {'synthetic': synthetic_conjoint_encoder},
                        'moment_estimation_encoder': {'synthetic': synthetic_moment_estimation_encoder,
                                                      'mnist': mnist_moment_estimation_encoder},
+
                        'decoder': {'synthetic': synthetic_decoder,
                                    'mnist': mnist_decoder,
                                    'mnist_simple': mnist_decoder_simple},
+                       'conjoint_decoder': {'synthetic': synthetic_decoder},
+
                        'discriminator': {'synthetic': synthetic_discriminator,
                                          'mnist': mnist_discriminator_simple,
                                          'mnist_simple': mnist_discriminator_simple},

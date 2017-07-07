@@ -1,9 +1,9 @@
 from numpy import save as save_array
 from os.path import join as path_join
-from numpy import repeat
+from numpy import repeat, asarray
 from avb.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
-from avb.model_trainer import AVBModelTrainer, VAEModelTrainer
-from avb.utils.datasets import load_npoints, load_mnist
+from avb.model_trainer import ConjointVAEModelTrainer
+from avb.utils.datasets import load_npoints
 from avb.utils.logger import logger
 
 from keras.backend import clear_session
@@ -14,104 +14,48 @@ from keras.backend import clear_session
 # set_session(tf.Session(config=config))
 
 
-def run_synthetic_experiment(model='vae', pretrained_model=None):
-    logger.info("Starting an experiment on the synthetic dataset using {} model".format(model))
-    data_dim = 4
-    data = load_npoints(n=data_dim)
+def run_synthetic_experiment():
+    logger.info("Starting a conjoint model experiment on the synthetic dataset.")
+    data_dims = (4, 4)
+    latent_dims = (2, 2, 2)
+    data = load_npoints(n=data_dims, noisy=False)
+    # data = ({'data': asarray([[1, 0, 0, 0], [0, 1, 0, 0]]), 'target': asarray([0, 1])},
+    #         {'data': asarray([[0.1, 0.1, 0.2, 0.99], [0.01, 0.01, 0.92, 0.3]]), 'target': asarray([0, 1])})
 
-    train_data, train_labels = data['data'], data['target']
+    trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
+                                      experiment_name='synthetic', overwrite=True,
+                                      optimiser_params={'lr': 0.0001})
 
-    if model == 'vae':
-        trainer = VAEModelTrainer(data_dim=data_dim, latent_dim=2, experiment_name='synthetic', overwrite=True,
-                                  optimiser_params={'lr': 0.001}, pretrained_dir=pretrained_model)
-    elif model == 'avb':
-        trainer = AVBModelTrainer(data_dim=data_dim, latent_dim=2, noise_dim=data_dim, experiment_name='synthetic',
-                                  overwrite=True, use_adaptive_contrast=False,
-                                  optimiser_params={'encdec': {'lr': 0.0008, 'beta_1': 0.5},
-                                                    'disc': {'lr': 0.0008, 'beta_1': 0.5}},
-                                  pretrained_dir=pretrained_model)
-    elif model == 'avb+ac':
-        trainer = AVBModelTrainer(data_dim=data_dim, latent_dim=2, noise_dim=data_dim, noise_basis_dim=8,
-                                  experiment_name='synthetic',  overwrite=True, use_adaptive_contrast=True,
-                                  optimiser_params={'encdec': {'lr': 0.0005, 'beta_1': 0.5},
-                                                    'disc': {'lr': 0.0007, 'beta_1': 0.5}},
-                                  pretrained_dir=pretrained_model)
-    else:
-        raise ValueError('Unknown model type. Supported models: `vae`, `avb` and `avb+ac`.')
-
-    model_dir = trainer.run_training(train_data, batch_size=400, epochs=200)
-    # model_dir = "output/"
+    model_dir = trainer.run_training(data, batch_size=400, epochs=1000)
     trained_model = trainer.get_model()
 
-    sampling_size = 1000
-    augmented_data = repeat(train_data, sampling_size, axis=0)
-    augmented_labels = repeat(train_labels, sampling_size, axis=0)
+    sampling_size = 400
 
-    reconstructions = trained_model.reconstruct(train_data, batch_size=1000, sampling_size=sampling_size)
-    save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
-    plot_reconstructed_data(augmented_data[:100], reconstructions[:100], fig_dirpath=model_dir)
-
-    latent_vars = trained_model.infer(train_data, batch_size=1000, sampling_size=sampling_size)
+    latent_vars = trained_model.infer(data, batch_size=400, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
-    plot_latent_2d(latent_vars, augmented_labels, fig_dirpath=model_dir)
+    plot_latent_2d(latent_vars[:, -2:], repeat(data[0]['target'], sampling_size),
+                   fig_dirpath=model_dir, fig_name='shared.png')
+    stop_id = 0
+    for i, lat_id in enumerate(latent_dims[:-1]):
+        start_id = stop_id
+        stop_id += lat_id
+        plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(data[0]['target'], sampling_size),
+                       fig_dirpath=model_dir, fig_name='private_{}'.format(i))
+
+    reconstructions = trained_model.reconstruct(data, batch_size=4, sampling_size=1)
+    save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
+    for i, rec in enumerate(reconstructions):
+        plot_reconstructed_data(data[i]['data'], rec[0],
+                                fig_dirpath=model_dir, fig_name='reconstructed_{}'.format(i))
 
     generations = trained_model.generate(n_samples=100, batch_size=100)
     save_array(path_join(model_dir, 'generated_samples.npy'), generations)
-    plot_sampled_data(generations, fig_dirpath=model_dir)
+    for i, gen in enumerate(generations):
+        plot_sampled_data(gen[0], fig_dirpath=model_dir, fig_name='data_{}'.format(i))
 
     clear_session()
     return model_dir
 
 
-def run_mnist_experiment(model='vae'):
-    logger.info("Starting an experiment on the MNIST dataset using {} model".format(model))
-    data_dim = 28**2
-    latent_dim = 8
-    data = load_mnist(binarised=True, one_hot=False)
-    test_data_size = 100
-    train_data, train_labels = data['data'][:-test_data_size], data['target'][:-test_data_size]
-    test_data, test_labels = data['data'][-test_data_size:], data['target'][-test_data_size:]
-
-    if model == 'vae':
-        trainer = VAEModelTrainer(data_dim=data_dim, latent_dim=latent_dim,
-                                  experiment_name='mnist', overwrite=True,
-                                  optimiser_params={'lr': 0.001})
-    elif model == 'avb':
-        trainer = AVBModelTrainer(data_dim=data_dim, latent_dim=latent_dim, noise_dim=16,
-                                  experiment_name='mnist', overwrite=True, use_adaptive_contrast=False,
-                                  optimiser_params={'encdec': {'lr': 0.001, 'beta_1': 0.5},
-                                                    'disc': {'lr': 0.001, 'beta_1': 0.5}})
-    elif model == 'avb+ac':
-        trainer = AVBModelTrainer(data_dim=data_dim, latent_dim=latent_dim, noise_dim=16, noise_basis_dim=32,
-                                  experiment_name='mnist', overwrite=True, use_adaptive_contrast=True,
-                                  optimiser_params={'encdec': {'lr': 1e-4, 'beta_1': 0.5},
-                                                    'disc': {'lr': 2e-4, 'beta_1': 0.5}})
-    else:
-        raise ValueError('Unknown model type. Supported models: `vae`, `avb` and `avb+ac`.')
-
-    model_dir = trainer.run_training(train_data, batch_size=64, epochs=1)
-    trained_model = trainer.get_model()
-
-    sampling_size = 100
-    reconstructions = trained_model.reconstruct(test_data,
-                                                batch_size=min(1000, test_data_size),
-                                                sampling_size=sampling_size)
-    save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
-    plot_reconstructed_data(test_data, reconstructions[::sampling_size], fig_dirpath=model_dir)
-
-    latent_vars = trained_model.infer(test_data,
-                                      batch_size=min(1000, test_data_size),
-                                      sampling_size=sampling_size)
-    save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
-    if latent_dim == 2:
-        repeated_labels = repeat(test_labels, sampling_size, axis=0)
-        plot_latent_2d(latent_vars, repeated_labels, fig_dirpath=model_dir)
-
-    generations = trained_model.generate(n_samples=100, batch_size=100)
-    save_array(path_join(model_dir, 'generated_samples.npy'), generations)
-    plot_sampled_data(generations, fig_dirpath=model_dir)
-    return model_dir
-
-
 if __name__ == '__main__':
-    run_synthetic_experiment('avb+ac', pretrained_model='output/avb_with_ac/synthetic/final')
+    run_synthetic_experiment()
