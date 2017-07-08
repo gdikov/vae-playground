@@ -6,6 +6,7 @@ from avb.model_trainer import ConjointVAEModelTrainer
 from avb.utils.datasets import load_npoints, load_mnist
 from avb.utils.logger import logger
 from keras.backend import clear_session
+from matplotlib import pyplot as plt
 # import tensorflow as tf
 # from keras.backend.tensorflow_backend import set_session
 # config = tf.ConfigProto()
@@ -57,9 +58,13 @@ def run_synthetic_experiment():
 
 
 if __name__ == '__main__':
-    data = load_mnist()
-    data = load_mnist(background='images')
-    data = load_mnist(background='noise')
-    data = load_mnist(rotated=True)
-    data = load_mnist(rotated=True,background='images')
+    # Visualize image from MNIST:
+    data = load_mnist(rotated=False,large_set=False,binarised=False,background='image')
+    i = 6793
+    img = data['data'][i].reshape((28,28))*255
+    print("Target: ",data['target'][i].argmax())
+    plt.imshow(img,cmap='gray',interpolation='nearest',vmin=0,vmax=255)
+    plt.savefig('test.png')
+
     #run_synthetic_experiment()
+

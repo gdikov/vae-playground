@@ -282,7 +282,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
         one_hot: bool whether the data targets should be converted to one hot encoded labels
         binarised: bool, whether the images should be ceiled/floored to 1 and 0 respectively.
         rotated: bool, whether digits should be rotated by an angle generated uniformly between 0 and 2pi
-        background: 'noise','images' or None, indicates whether to use random noise, images or black as background
+        background: 'noise','image' or None, indicates whether to use random noise, images or black as background
         large_set: bool, whether to use 50k images instead of 12k.
 
     Returns:
@@ -293,25 +293,26 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     if not rotated:
         if not background:
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist.zip'
-        elif background == 'images':
+        elif background == 'image':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_images.zip'
         elif background == 'noise':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_random.zip'
+        else:
+            logger.error("Background must be either 'None','image' or 'noise'")
+            raise ValueError
     elif rotated:
         if not background:
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_rotation_new.zip'
             train_filename = 'mnist_all_rotation_normalized_float_train_valid.amat'
             test_filename = 'mnist_all_rotation_normalized_float_test.amat'
-        elif background == 'images':
+        elif background == 'image':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_rotation_back_image_new.zip'
             train_filename = 'mnist_all_background_images_rotation_normalized_train_valid.amat'
             test_filename = 'mnist_all_background_images_rotation_normalized_test.amat'
-        elif background == 'noise':
-            logger.error("Rotated images with noise background not available")
+        else:
+            logger.error("Background must be either 'None' or 'image' if digits are rotated")
             raise ValueError
-    else:
-        logger.error("background must be either 'None','images' or 'noise'")
-        raise ValueError
+
 
     mnist_style = url.split('/')[-1].split('.')[0]
     if not train_filename:
