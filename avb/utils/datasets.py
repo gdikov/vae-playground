@@ -288,12 +288,11 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     Returns:
         A dict with `data` and `target` keys with the MNIST data converted to [0, 1] floats. 
     """
-
+    train_filename = None
+    test_filename = None
     if not rotated:
         if not background:
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist.zip'
-            train_filename = 'mnist_train.amat'
-            test_filename = 'mnist_test.amat'
         elif background == 'images':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_images.zip'
         elif background == 'noise':
@@ -301,8 +300,12 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     elif rotated:
         if not background:
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_rotation_new.zip'
+            train_filename = 'mnist_all_rotation_normalized_float_train_valid.amat'
+            test_filename = 'mnist_all_rotation_normalized_float_test.amat'
         elif background == 'images':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_rotation_back_image_new.zip'
+            train_filename = 'mnist_all_background_images_rotation_normalized_train_valid.amat'
+            test_filename = 'mnist_all_background_images_rotation_normalized_test.amat'
         elif background == 'noise':
             logger.error("Rotated images with noise background not available")
             raise ValueError
@@ -311,6 +314,9 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
         raise ValueError
 
     mnist_style = url.split('/')[-1].split('.')[0]
+    if not train_filename:
+        train_filename = mnist_style+'_train'+'.amat'
+        test_filename = mnist_style+'_test'+'.amat'
 
     def convert_to_one_hot(raw_target):
         n_uniques = len(np.unique(raw_target))

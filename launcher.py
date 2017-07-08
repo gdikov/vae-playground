@@ -58,4 +58,8 @@ def run_synthetic_experiment():
 
 if __name__ == '__main__':
     data = load_mnist()
+    data = load_mnist(background='images')
+    data = load_mnist(background='noise')
+    data = load_mnist(rotated=True)
+    data = load_mnist(rotated=True,background='images')
     #run_synthetic_experiment()
