@@ -25,12 +25,15 @@ np.random.seed(config['seed'])
 
 
 def load_usps(local_data_path=None):
-    '''
+    """
     Load the USPS dataset from local file or download it if not available.
+    
+    Args:
+        local_data_path: path to the USPS dataset. Assumes unpacked files and original filenames.
 
-    :param local_data_path: path to the USPS dataset. Assumes unpacked files and original filenames.
-    :return: A dict with `data` and `target` keys with the USPS data  grayscale images.
-    '''
+    Returns:
+        A dict with `data` and `target` keys with the USPS data  grayscale images.
+    """
 
     usps_path = os.path.join(PROJECT_DATA_DIR, "USPS")
     if local_data_path is None and not os.path.exists(usps_path):
@@ -289,6 +292,8 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     if not rotated:
         if not background:
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist.zip'
+            train_filename = 'mnist_train.amat'
+            test_filename = 'mnist_test.amat'
         elif background == 'images':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_images.zip'
         elif background == 'noise':
@@ -324,13 +329,13 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
 
     if local_data_path is None and not os.path.exists(mnist_path):
         local_data_path = mnist_path
-        os.makedirs(mnist_path)
+        os.makedirs(local_data_path)
         logger.info(
             "Path to locally stored data not provided. Proceeding with downloading the {} dataset.".format(mnist_style))
-        file_path = os.path.join(mnist_path, mnist_style + '.zip')
-        urlretrieve(url, file_path)
-        with zipfile.ZipFile(file_path, "r") as zip_ref:
-            zip_ref.extractall(mnist_path)
+        zipped_file_path = os.path.join(local_data_path, mnist_style + '.zip')
+        urlretrieve(url, zipped_file_path)
+        with zipfile.ZipFile(zipped_file_path, "r") as zip_ref:
+            zip_ref.extractall(local_data_path)
         logger.info("Sucessfully downloaded and extracted {} dataset.".format(mnist_style))
     else:
         local_data_path = local_data_path or mnist_path
@@ -339,7 +344,11 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
             raise ValueError
 
     logger.info("Loading {} dataset from {}".format(mnist_style, local_data_path))
-    mnist_images, mnist_labels = _load_mnist_from_file(local_data_path, mnist_style, large_set)
+    # Training set has 12k images, test set has 50k images
+    # For more information see: http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/MnistVariations
+    file_name = test_filename if large_set else train_filename
+    file = os.path.join(local_data_path,file_name)
+    mnist_images, mnist_labels = _load_mnist_from_file(file, large_set)
     logger.info("Sucessfully loaded {} dataset.".format(mnist_style, local_data_path))
 
     mnist = {'data': mnist_images, 'target': mnist_labels}
@@ -353,25 +362,18 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     return mnist
 
 
-def _load_mnist_from_file(data_dir, mnist_style, large_set):
+def _load_mnist_from_file(file, large_set):
     """
     Load the binary files from disk. 
 
     Args:
-        data_dir: path to file containing the MNIST dataset. 
-        mnist_style: string, which variation of mnist to use (rotated, background)
-        large_set: bool, whether to use 50k or 12k images
+        file: location where to load mnist from
 
     Returns:
         A numpy array with the images and a numpy array with the corresponding labels. 
     """
 
-    # Training set has 12k images, test set has 50k images
-    # For more information see: http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/MnistVariations
-    set = '_test' if large_set else '_train'
-
-    file_path = os.path.join(data_dir, mnist_style + set + '.amat')
-    with open(file_path, 'r') as f:
+    with open(file, 'r') as f:
         data = read_csv(f, delimiter='\s+', header=None).values
     images = data[:, :-1]
     labels = data[:, -1].astype(np.uint8)
