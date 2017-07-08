@@ -3,9 +3,8 @@ from os.path import join as path_join
 from numpy import repeat, asarray
 from avb.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from avb.model_trainer import ConjointVAEModelTrainer
-from avb.utils.datasets import load_npoints
+from avb.utils.datasets import load_npoints, load_mnist
 from avb.utils.logger import logger
-
 from keras.backend import clear_session
 # import tensorflow as tf
 # from keras.backend.tensorflow_backend import set_session
@@ -58,4 +57,5 @@ def run_synthetic_experiment():
 
 
 if __name__ == '__main__':
-    run_synthetic_experiment()
+    data = load_mnist()
+    #run_synthetic_experiment()

@@ -1,14 +1,14 @@
 from numpy import load as load_array
 from os.path import join as path_join
 from avb.metrics import evidence_lower_bound, normality_of_marginal_posterior, reconstruction_error, data_log_likelihood
-from avb.utils.datasets import load_npoints, load_mnist
+from avb.utils.datasets import load_npoints, load_mnist_old
 
 
 if __name__ == '__main__':
     experiment = 'synthetic'
     if experiment == 'mnist':
         model_dir = "output/models/mnist"
-        data = load_mnist(binarised=True, one_hot=False)
+        data = load_mnist_old(binarised=True, one_hot=False)
         test_data_size = 100
         true_samples = data['data'][-test_data_size:]
     elif experiment == 'synthetic':

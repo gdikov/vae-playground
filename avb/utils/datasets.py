@@ -2,6 +2,8 @@ import gzip
 import logging
 import struct
 import scipy.io
+import zipfile
+from pandas import read_csv
 
 import numpy as np
 import os
@@ -69,7 +71,7 @@ def _load_usps_from_file(data_dir=None):
 
     train_dict = scipy.io.loadmat(train_file)
     images = train_dict['data']
-    images = np.reshape(images, [256, 1100*10])
+    images = np.reshape(images, [256, 1100 * 10])
     labels = np.repeat(np.eye(10), 1100, axis=0)
 
     return images, labels
@@ -158,7 +160,7 @@ def _load_svhn_from_file(data_dir=None, extra_set=False):
         e_images = np.asarray(train_dict['X'])
         e_labels = np.asarray(train_dict['y'])
         images = np.concatenate((images, e_images), axis=0)
-        labels = np.concatenate((labels, e_labels), axis = 0)
+        labels = np.concatenate((labels, e_labels), axis=0)
 
     labels = labels.flatten()
     # labels mapping maps 1-9 digits to 1-9 label, however 0 has label 10 (for some reason), hence the reassignment.
@@ -167,7 +169,7 @@ def _load_svhn_from_file(data_dir=None, extra_set=False):
     return images, labels
 
 
-def load_mnist(local_data_path=None, one_hot=True, binarised=True):
+def load_mnist_old(local_data_path=None, one_hot=True, binarised=True):
     """
     Load the MNIST dataset from local file or download it if not available.
     
@@ -200,7 +202,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True):
     #
     # However this dataset does not contain label information and hence it is better go binarise it manually.
 
-    mnist_path = os.path.join(PROJECT_DATA_DIR, "MNIST")
+    mnist_path = os.path.join(PROJECT_DATA_DIR, "MNIST_old")
     if local_data_path is None and not os.path.exists(mnist_path):
         logger.info("Path to locally stored data not provided. Proceeding with downloading the MNIST dataset.")
         from tensorflow.examples.tutorials.mnist import input_data
@@ -218,7 +220,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True):
         local_data_path = local_data_path or mnist_path
         logger.info("Loading MNIST dataset from {}".format(local_data_path))
         if os.path.exists(local_data_path):
-            mnist_imgs, mnist_labels = _load_mnist_from_file(local_data_path)
+            mnist_imgs, mnist_labels = _load_mnist_from_file_old(local_data_path)
             if one_hot:
                 mnist_labels = convert_to_one_hot(mnist_labels)
             mnist = {'data': mnist_imgs, 'target': mnist_labels}
@@ -232,7 +234,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True):
     return mnist
 
 
-def _load_mnist_from_file(data_dir=None):
+def _load_mnist_from_file_old(data_dir=None):
     """
     Load the binary files from disk. 
     
@@ -262,6 +264,117 @@ def _load_mnist_from_file(data_dir=None):
 
     images = np.concatenate([read_images(fname) for fname in image_files]) / 255.
     labels = np.concatenate([read_labels(fname) for fname in label_files])
+
+    return images, labels
+
+
+def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False, background=None, large_set=False):
+    """
+    Load an MNIST dataset from local file or download it if not available.
+    Digits can be rotated or have images/noise in background
+    For more information on different sets: http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/MnistVariations
+
+    Args:
+        local_data_path: path to the MNIST dataset. Assumes unpacked files and original filenames. 
+        one_hot: bool whether the data targets should be converted to one hot encoded labels
+        binarised: bool, whether the images should be ceiled/floored to 1 and 0 respectively.
+        rotated: bool, whether digits should be rotated by an angle generated uniformly between 0 and 2pi
+        background: 'noise','images' or None, indicates whether to use random noise, images or black as background
+        large_set: bool, whether to use 50k images instead of 12k.
+
+    Returns:
+        A dict with `data` and `target` keys with the MNIST data converted to [0, 1] floats. 
+    """
+
+    if not rotated:
+        if not background:
+            url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist.zip'
+        elif background == 'images':
+            url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_images.zip'
+        elif background == 'noise':
+            url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_random.zip'
+    elif rotated:
+        if not background:
+            url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_rotation_new.zip'
+        elif background == 'images':
+            url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_rotation_back_image_new.zip'
+        elif background == 'noise':
+            logger.error("Rotated images with noise background not available")
+            raise ValueError
+    else:
+        logger.error("background must be either 'None','images' or 'noise'")
+        raise ValueError
+
+    mnist_style = url.split('/')[-1].split('.')[0]
+
+    def convert_to_one_hot(raw_target):
+        n_uniques = len(np.unique(raw_target))
+        one_hot_target = np.zeros((raw_target.shape[0], n_uniques))
+        one_hot_target[np.arange(raw_target.shape[0]), raw_target.astype(np.int)] = 1
+        return one_hot_target
+
+    def binarise(raw_data, mode='sampling', **kwargs):
+        if mode == 'sampling':
+            return np.random.binomial(1, p=raw_data).astype(np.int32)
+        elif mode == 'threshold':
+            threshold = kwargs.get('threshold', 0.5)
+            return (raw_data > threshold).astype(np.int32)
+
+    mnist_path = os.path.join(PROJECT_DATA_DIR, mnist_style)
+
+    if local_data_path is None and not os.path.exists(mnist_path):
+        local_data_path = mnist_path
+        os.makedirs(mnist_path)
+        logger.info(
+            "Path to locally stored data not provided. Proceeding with downloading the {} dataset.".format(mnist_style))
+        file_path = os.path.join(mnist_path, mnist_style + '.zip')
+        urlretrieve(url, file_path)
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall(mnist_path)
+        logger.info("Sucessfully downloaded and extracted {} dataset.".format(mnist_style))
+    else:
+        local_data_path = local_data_path or mnist_path
+        if not os.path.exists(local_data_path):
+            logger.error("Path to locally stored MNIST does not exist.")
+            raise ValueError
+
+    logger.info("Loading {} dataset from {}".format(mnist_style, local_data_path))
+    mnist_images, mnist_labels = _load_mnist_from_file(local_data_path, mnist_style, large_set)
+    logger.info("Sucessfully loaded {} dataset.".format(mnist_style, local_data_path))
+
+    mnist = {'data': mnist_images, 'target': mnist_labels}
+
+    if binarised:
+        mnist['data'] = binarise(mnist['data'], mode='threshold')
+
+    if one_hot:
+        mnist['target'] = convert_to_one_hot(mnist['target'])
+
+    return mnist
+
+
+def _load_mnist_from_file(data_dir, mnist_style, large_set):
+    """
+    Load the binary files from disk. 
+
+    Args:
+        data_dir: path to file containing the MNIST dataset. 
+        mnist_style: string, which variation of mnist to use (rotated, background)
+        large_set: bool, whether to use 50k or 12k images
+
+    Returns:
+        A numpy array with the images and a numpy array with the corresponding labels. 
+    """
+
+    # Training set has 12k images, test set has 50k images
+    # For more information see: http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/MnistVariations
+    set = '_test' if large_set else '_train'
+
+    file_path = os.path.join(data_dir, mnist_style + set + '.amat')
+    with open(file_path, 'r') as f:
+        data = read_csv(f, delimiter='\s+', header=None).values
+    images = data[:, :-1]
+    labels = data[:, -1].astype(np.uint8)
 
     return images, labels
 
