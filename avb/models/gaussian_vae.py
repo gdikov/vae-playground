@@ -107,15 +107,15 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
         reconstruction_log_likelihood = self.decoder(self.data_input + [posterior_approximation], is_learning=True)
         vae_loss = VAELossLayer(name='vae_loss')([reconstruction_log_likelihood, latent_mean, latent_log_var])
 
-        self.vae_model = Model(inputs=self.data_input, outputs=vae_loss)
+        self.conjoint_vae_model = Model(inputs=self.data_input, outputs=vae_loss)
 
         if resume_from is not None:
             self.load(resume_from, custom_layers={'VAELossLayer': VAELossLayer})
 
         optimiser_params = optimiser_params or {'lr': 1e-3}
-        self.vae_model.compile(optimizer=RMSprop(**optimiser_params), loss=None)
+        self.conjoint_vae_model.compile(optimizer=RMSprop(**optimiser_params), loss=None)
 
-        self.models_dict['conjoint_vae_model'] = self.vae_model
+        self.models_dict['conjoint_vae_model'] = self.conjoint_vae_model
         self.data_iterator = ConjointVAEDataIterator(data_dim=data_dims, latent_dim=latent_dims, seed=config['seed'])
 
     def fit(self, data, batch_size=32, epochs=1, **kwargs):
@@ -138,7 +138,7 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
             epoch_loss_history_vae = []
             for it in range(batches_per_epoch):
                 data_batch = next(data_iterator)
-                loss_autoencoder = self.vae_model.train_on_batch(data_batch, None)
+                loss_autoencoder = self.conjoint_vae_model.train_on_batch(data_batch, None)
                 epoch_loss_history_vae.append(loss_autoencoder)
             history['conjoint_vae_loss'].append(epoch_loss_history_vae)
 
