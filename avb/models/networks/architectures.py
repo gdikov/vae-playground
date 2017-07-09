@@ -219,18 +219,29 @@ def mnist_encoder_simple(data_dim, noise_dim, latent_dim=8):
     return latent_factors
 
 
-def mnist_reparametrized_encoder(inputs, latent_dim):
+def mnist_reparametrized_encoder(inputs, latent_dim, name_prefix=''):
     # center the input around 0
-    centered_data = Lambda(lambda x: 2 * x - 1, name='enc_centering_data_input')(inputs)
-    convnet_input = Reshape((28, 28, 1), name='rep_enc_data_reshape')(centered_data)
+    centered_data = Lambda(lambda x: 2 * x - 1, name=name_prefix + 'enc_centering_data_input')(inputs)
+    convnet_input = Reshape((28, 28, 1), name=name_prefix + 'rep_enc_data_reshape')(centered_data)
     conv_output = deflating_convolution(convnet_input, n_deflation_layers=3,
-                                        n_filters_init=64, name_prefix='rep_enc_data_body')
-    latent_factors = Reshape((-1,), name='rep_enc_data_features_reshape')(conv_output)
-    latent_factors = Dense(800, activation='relu', name='rep_enc_expanding_before_latent')(latent_factors)
-    latent_mean = Dense(latent_dim, activation=None, name='rep_enc_mean')(latent_factors)
+                                        n_filters_init=64, name_prefix=name_prefix + 'rep_enc_data_body')
+    latent_factors = Reshape((-1,), name=name_prefix + 'rep_enc_data_features_reshape')(conv_output)
+    latent_factors = Dense(800, activation='relu', name=name_prefix + 'rep_enc_expanding_before_latent')(latent_factors)
+    latent_mean = Dense(latent_dim, activation=None, name=name_prefix + 'rep_enc_mean')(latent_factors)
     # since the variance must be positive and this is not easy to restrict, interpret it in the log domain
-    latent_log_var = Dense(latent_dim, activation=None, name='rep_enc_var')(latent_factors)
+    latent_log_var = Dense(latent_dim, activation=None, name=name_prefix + 'rep_enc_var')(latent_factors)
     return latent_mean, latent_log_var
+
+
+def mnist_conjoint_encoder(inputs, name_prefix=''):
+    # center the input around 0
+    centered_data = Lambda(lambda x: 2 * x - 1, name=name_prefix + 'enc_centering_data_input')(inputs)
+    convnet_input = Reshape((28, 28, 1), name=name_prefix + 'rep_enc_data_reshape')(centered_data)
+    conv_output = deflating_convolution(convnet_input, n_deflation_layers=3,
+                                        n_filters_init=64, name_prefix=name_prefix + 'rep_enc_data_body')
+    latent_factors = Reshape((-1,), name=name_prefix + 'rep_enc_data_features_reshape')(conv_output)
+    latent_factors = Dense(800, activation='relu', name=name_prefix + 'rep_enc_expanding_before_latent')(latent_factors)
+    return latent_factors
 
 
 def mnist_reparametrized_encoder_simple(inputs, latent_dim):
@@ -289,15 +300,16 @@ def mnist_moment_estimation_encoder(data_dim, noise_dim, noise_basis_dim, latent
     return coefficients_model, noise_basis_vectors_model
 
 
-def mnist_decoder(inputs):
-    decoder_body = Dense(200, activation='relu', name='dec_body_initial_dense')(inputs)
+def mnist_decoder(inputs, name_prefix=''):
+    decoder_body = Dense(200, activation='relu', name=name_prefix + 'dec_body_initial_dense')(inputs)
     # use transposed convolutions to inflate the latent space to (?, 32, 32, 8)
-    decoder_body = inflating_convolution(decoder_body, 3, projection_space_shape=(4, 4, 32), name_prefix='dec_body')
+    decoder_body = inflating_convolution(decoder_body, 3, projection_space_shape=(4, 4, 32),
+                                         name_prefix=name_prefix + 'dec_body')
     # use single non-padded convolution to shrink the size to (?, 28, 28, 1)
     decoder_body = Conv2D(filters=1, kernel_size=(5, 5), strides=(1, 1), activation='relu',
-                          padding='valid', name='dec_body_conv')(decoder_body)
+                          padding='valid', name=name_prefix + 'dec_body_conv')(decoder_body)
     # reshape to flatten out the output
-    decoder_body = Reshape((-1,), name='dec_body_reshape_out')(decoder_body)
+    decoder_body = Reshape((-1,), name=name_prefix + 'dec_body_reshape_out')(decoder_body)
     return decoder_body
 
 
@@ -356,14 +368,16 @@ get_network_by_name = {'encoder': {'synthetic': synthetic_encoder,
                        'reparametrised_encoder': {'synthetic': synthetic_reparametrized_encoder,
                                                   'mnist': mnist_reparametrized_encoder,
                                                   'mnist_simple': mnist_reparametrized_encoder_simple},
-                       'conjoint_encoder': {'synthetic': synthetic_conjoint_encoder},
+                       'conjoint_encoder': {'synthetic': synthetic_conjoint_encoder,
+                                            'mnist': mnist_conjoint_encoder},
                        'moment_estimation_encoder': {'synthetic': synthetic_moment_estimation_encoder,
                                                      'mnist': mnist_moment_estimation_encoder},
 
                        'decoder': {'synthetic': synthetic_decoder,
                                    'mnist': mnist_decoder,
                                    'mnist_simple': mnist_decoder_simple},
-                       'conjoint_decoder': {'synthetic': synthetic_decoder},
+                       'conjoint_decoder': {'synthetic': synthetic_decoder,
+                                            'mnist': mnist_decoder},
 
                        'discriminator': {'synthetic': synthetic_discriminator,
                                          'mnist': mnist_discriminator_simple,

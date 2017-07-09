@@ -299,7 +299,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
         elif background == 'noise':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_random.zip'
         else:
-            logger.error("Background must be either 'None','image' or 'noise'")
+            logger.error("Background must be either 'None', 'image' or 'noise'")
             raise ValueError
     else:
         if not background:

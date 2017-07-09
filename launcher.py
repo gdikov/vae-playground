@@ -67,41 +67,43 @@ def run_synthetic_experiment():
     return model_dir
 
 
-def run_mnist_experiment():
+def run_mnist_experiment(pretrained_model=None):
     logger.info("Starting a conjoint model experiment on the MNIST Variations dataset.")
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
     data_1 = load_mnist(one_hot=False, binarised=False, background=None)
     data_2 = load_mnist(one_hot=False, binarised=False, background='image')
-    train_data = ({'data': data_1['data'][:-1000], 'target': data_1['target'][:-1000]},
-                  {'data': data_2['data'][:-1000], 'target': data_2['target'][:-1000]})
+    train_data = ({'data': data_1['data'][:100], 'target': data_1['target'][:100]},
+                  {'data': data_2['data'][:100], 'target': data_2['target'][:100]})
     test_data = ({'data': data_1['data'][-1000:], 'target': data_1['target'][-1000:]},
                  {'data': data_2['data'][-1000:], 'target': data_2['target'][-1000:]})
 
     trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
-                                      experiment_name='mnist_variations', architecture='synthetic',
-                                      overwrite=True, optimiser_params={'lr': 0.0005})
+                                      experiment_name='mnist_variations', architecture='mnist',
+                                      overwrite=True, optimiser_params={'lr': 0.0008, 'beta_1': 0.5},
+                                      pretrained_dir=pretrained_model)
 
-    model_dir = trainer.run_training(train_data, batch_size=1000, epochs=1000)
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000, save_interrupted=True)
+    # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
 
     sampling_size = 10
 
-    latent_vars = trained_model.infer(test_data, batch_size=100, sampling_size=sampling_size)
+    latent_vars = trained_model.infer(train_data, batch_size=100, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
-    plot_latent_2d(latent_vars[:, -2:], repeat(test_data[0]['target'], sampling_size),
+    plot_latent_2d(latent_vars[:, -2:], repeat(train_data[0]['target'], sampling_size),
                    fig_dirpath=model_dir, fig_name='shared.png')
     stop_id = 0
     for i, lat_id in enumerate(latent_dims[:-1]):
         start_id = stop_id
         stop_id += lat_id
-        plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(test_data[0]['target'], sampling_size),
+        plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(train_data[0]['target'], sampling_size),
                        fig_dirpath=model_dir, fig_name='private_{}'.format(i))
 
-    reconstructions = trained_model.reconstruct(test_data, batch_size=100, sampling_size=1)
+    reconstructions = trained_model.reconstruct(train_data, batch_size=100, sampling_size=1)
     save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
     for i, rec in enumerate(reconstructions):
-        plot_reconstructed_data(test_data[i]['data'], rec,
+        plot_reconstructed_data(train_data[i]['data'], rec,
                                 fig_dirpath=model_dir, fig_name='reconstructed_{}'.format(i))
 
     generations = trained_model.generate(n_samples=100, batch_size=100)
@@ -114,4 +116,4 @@ def run_mnist_experiment():
 
 
 if __name__ == '__main__':
-    run_mnist_experiment()
+    run_mnist_experiment()#pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')

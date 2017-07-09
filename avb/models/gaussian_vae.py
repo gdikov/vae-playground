@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from builtins import range, next
 
 from keras.models import Model
-from keras.optimizers import RMSprop
+from keras.optimizers import RMSprop, Adam
 from tqdm import tqdm
 
 from ..utils.config import load_config
@@ -113,7 +113,7 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
             self.load(resume_from, custom_layers={'VAELossLayer': VAELossLayer})
 
         optimiser_params = optimiser_params or {'lr': 1e-3}
-        self.conjoint_vae_model.compile(optimizer=RMSprop(**optimiser_params), loss=None)
+        self.conjoint_vae_model.compile(optimizer=Adam(**optimiser_params), loss=None)
 
         self.models_dict['conjoint_vae_model'] = self.conjoint_vae_model
         self.data_iterator = ConjointVAEDataIterator(data_dim=data_dims, latent_dim=latent_dims, seed=config['seed'])
