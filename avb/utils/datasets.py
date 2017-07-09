@@ -301,7 +301,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
         else:
             logger.error("Background must be either 'None','image' or 'noise'")
             raise ValueError
-    elif rotated:
+    else:
         if not background:
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_rotation_new.zip'
             train_filename = 'mnist_all_rotation_normalized_float_train_valid.amat'
@@ -313,7 +313,6 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
         else:
             logger.error("Background must be either 'None' or 'image' if digits are rotated")
             raise ValueError
-
 
     mnist_style = url.split('/')[-1].split('.')[0]
     if not train_filename:
@@ -344,7 +343,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
         urlretrieve(url, zipped_file_path)
         with zipfile.ZipFile(zipped_file_path, "r") as zip_ref:
             zip_ref.extractall(local_data_path)
-        logger.info("Sucessfully downloaded and extracted {} dataset.".format(mnist_style))
+        logger.info("Successfully downloaded and extracted {} dataset.".format(mnist_style))
     else:
         local_data_path = local_data_path or mnist_path
         if not os.path.exists(local_data_path):
@@ -355,9 +354,9 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     # Training set has 12k images, test set has 50k images
     # For more information see: http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/MnistVariations
     file_name = test_filename if large_set else train_filename
-    file = os.path.join(local_data_path,file_name)
-    mnist_images, mnist_labels = _load_mnist_from_file(file, large_set)
-    logger.info("Sucessfully loaded {} dataset.".format(mnist_style, local_data_path))
+    filepath = os.path.join(local_data_path, file_name)
+    mnist_images, mnist_labels = _load_mnist_from_file(filepath)
+    logger.info("Successfully loaded {} dataset.".format(mnist_style, local_data_path))
 
     mnist = {'data': mnist_images, 'target': mnist_labels}
 
@@ -370,20 +369,20 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     return mnist
 
 
-def _load_mnist_from_file(file, large_set):
+def _load_mnist_from_file(filepath):
     """
     Load the binary files from disk. 
 
     Args:
-        file: location where to load mnist from
+        filepath: location where to load mnist from
 
     Returns:
         A numpy array with the images and a numpy array with the corresponding labels. 
     """
 
-    with open(file, 'r') as f:
+    with open(filepath, 'r') as f:
         data = read_csv(f, delimiter='\s+', header=None).values
-    images = data[:, :-1]
+    images = data[:, :-1].astype(np.float32)
     labels = data[:, -1].astype(np.uint8)
 
     return images, labels
