@@ -292,7 +292,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     train_filename = None
     test_filename = None
     if not rotated:
-        if not background:
+        if background is None or background == 'none':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist.zip'
         elif background == 'image':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_images.zip'
@@ -302,7 +302,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
             logger.error("Background must be either 'None', 'image' or 'noise'")
             raise ValueError
     else:
-        if not background:
+        if background is None or background == 'none':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_rotation_new.zip'
             train_filename = 'mnist_all_rotation_normalized_float_train_valid.amat'
             test_filename = 'mnist_all_rotation_normalized_float_test.amat'
@@ -356,7 +356,9 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     file_name = test_filename if large_set else train_filename
     filepath = os.path.join(local_data_path, file_name)
     mnist_images, mnist_labels = _load_mnist_from_file(filepath)
-    logger.info("Successfully loaded {} dataset.".format(mnist_style, local_data_path))
+    if not rotated and background in ['noise', 'image']:
+        mnist_images = mnist_images.reshape(-1, 28, 28).transpose(0, 2, 1).reshape(-1, 28*28)
+    logger.debug("Successfully loaded {} dataset.".format(mnist_style, local_data_path))
 
     mnist = {'data': mnist_images, 'target': mnist_labels}
 
