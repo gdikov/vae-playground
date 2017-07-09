@@ -143,8 +143,8 @@ class AVBModelTrainer(ModelTrainer):
     """
     ModelTrainer class for the AVBModel.
     """
-    def __init__(self, data_dim, latent_dim, noise_dim, experiment_name, schedule=None,
-                 pretrained_dir=None, overwrite=True, use_adaptive_contrast=False,
+    def __init__(self, data_dim, latent_dim, noise_dim, experiment_name, architecture,
+                 schedule=None, pretrained_dir=None, overwrite=True, use_adaptive_contrast=False,
                  noise_basis_dim=None, optimiser_params=None):
         """
         Args:
@@ -152,6 +152,7 @@ class AVBModelTrainer(ModelTrainer):
             latent_dim: int, flattened latent dimensionality
             noise_dim: int, flattened noise dimensionality
             experiment_name: str, name of the training/experiment for logging purposes
+            architecture: str, name of the network architecture to be used
             schedule: dict, schedule of training discriminator and encoder-decoder networks
             overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
             use_adaptive_contrast: bool, whether to train according to the Adaptive Contrast algorithm
@@ -164,7 +165,7 @@ class AVBModelTrainer(ModelTrainer):
                                           use_adaptive_contrast=use_adaptive_contrast,
                                           optimiser_params=optimiser_params,
                                           resume_from=pretrained_dir,
-                                          experiment_architecture=experiment_name)
+                                          experiment_architecture=architecture)
         self.schedule = schedule or {'iter_discr': 1, 'iter_encdec': 1}
         super(AVBModelTrainer, self).__init__(model=avb, experiment_name=experiment_name, overwrite=overwrite)
 
@@ -193,19 +194,20 @@ class VAEModelTrainer(ModelTrainer):
     ModelTrainer class for the GaussianVariationalAutoencoder (as per [TODO: add citation to Kingma, Welling]).
     """
 
-    def __init__(self, data_dim, latent_dim, experiment_name, overwrite=True,
+    def __init__(self, data_dim, latent_dim, experiment_name, architecture, overwrite=True,
                  optimiser_params=None, pretrained_dir=None):
         """
         Args:
             data_dim: int, flattened data dimensionality 
             latent_dim: int, flattened latent dimensionality
             experiment_name: str, name of the training/experiment for logging purposes
+            architecture: str, name of the network architecture to be used
             overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
             optimiser_params: dict, parameters for the optimiser
             pretrained_dir: str, optional path to the pre-trained model directory with the hdf5 and json files
         """
         vae = GaussianVariationalAutoencoder(data_dim=data_dim, latent_dim=latent_dim,
-                                             experiment_architecture=experiment_name,
+                                             experiment_architecture=architecture,
                                              optimiser_params=optimiser_params,
                                              resume_from=pretrained_dir)
         super(VAEModelTrainer, self).__init__(model=vae, experiment_name=experiment_name, overwrite=overwrite)
@@ -233,19 +235,20 @@ class ConjointVAEModelTrainer(ModelTrainer):
     ModelTrainer class for the Conjoint Variational Autoencoder.
     """
 
-    def __init__(self, data_dims, latent_dims, experiment_name, overwrite=True,
+    def __init__(self, data_dims, latent_dims, experiment_name, architecture, overwrite=True,
                  optimiser_params=None, pretrained_dir=None):
         """
         Args:
             data_dims: int, flattened data dimensionality
             latent_dims: int, flattened latent dimensionality
             experiment_name: str, name of the training/experiment for logging purposes
+            architecture: str, name of the network architecture to be used
             overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
             optimiser_params: dict, parameters for the optimiser
             pretrained_dir: str, optional path to the pre-trained model directory with the hdf5 and json files
         """
         conj_vae = ConjointGaussianVariationalAutoencoder(data_dims=data_dims, latent_dims=latent_dims,
-                                                          experiment_architecture=experiment_name,
+                                                          experiment_architecture=architecture,
                                                           optimiser_params=optimiser_params,
                                                           resume_from=pretrained_dir)
         super(ConjointVAEModelTrainer, self).__init__(model=conj_vae, experiment_name=experiment_name,
