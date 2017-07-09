@@ -135,8 +135,8 @@ class ConjointVAEDataIterator(DataIterator):
                                                  for dataset_groups in indices_groups]
                                                  for random_group_id in random_groups]).T
                     else:
-                        sample_ids = np.squeeze([np.random.choice(dataset_groups[i % len(unique_labels)],
-                                                                  size=batch_size)
+                        group_id = int(i / (n_batches / len(unique_labels)))
+                        sample_ids = np.squeeze([np.random.choice(dataset_groups[group_id], size=batch_size)
                                                  for dataset_groups in indices_groups])
                     batch = [data[i]['data'][ids].astype(np.float32) for i, ids in enumerate(sample_ids)]
                     yield batch
