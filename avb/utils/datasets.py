@@ -32,7 +32,7 @@ def load_usps(local_data_path=None):
         local_data_path: path to the USPS dataset. Assumes unpacked files and original filenames.
 
     Returns:
-        A dict with `data` and `target` keys with the USPS data  grayscale images.
+        A dict with `data` and `target` keys with the USPS data grayscale images.
     """
 
     usps_path = os.path.join(PROJECT_DATA_DIR, "USPS")
@@ -80,7 +80,7 @@ def _load_usps_from_file(data_dir=None):
     return images, labels
 
 
-def load_svhn(local_data_path=None, one_hot=True, grayscale=True, extra_set=False):
+def load_svhn(local_data_path=None, one_hot=True, grayscale=True, use_extra_set=False):
     """
     Load the SVHN dataset from local file or download it if not available.
 
@@ -88,6 +88,7 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True, extra_set=Fals
         local_data_path: path to the SVHN dataset. Assumes unpacked files and original filenames.
         one_hot: bool whether tha data targets should be converted to one hot encoded labels
         grayscale: bool, whether the images should be converted to a grayscale images.
+        use_extra_set: bool, whether to use the additional dataset with easier examples
 
     Returns:
         A dict with `data` and `target` keys with the SVHN data converted to grayscale images.
@@ -116,7 +117,7 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True, extra_set=Fals
         file_name1 = os.path.join(svhn_path, 'extra_32x32.mat')
         url1 = 'http://ufldl.stanford.edu/housenumbers/extra_32x32.mat'
         urlretrieve(url1, file_name1)
-        svhn_imgs, svhn_labels = _load_svhn_from_file(svhn_path, extra_set)
+        svhn_imgs, svhn_labels = _load_svhn_from_file(svhn_path, use_extra_set)
         if one_hot:
             svhn_labels = convert_to_one_hot(svhn_labels)
         svhn = {'data': svhn_imgs, 'target': svhn_labels}
@@ -124,7 +125,7 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True, extra_set=Fals
         local_data_path = local_data_path or svhn_path
         logger.info("Loading SVHN dataset from {}".format(local_data_path))
         if os.path.exists(local_data_path):
-            svhn_imgs, svhn_labels = _load_svhn_from_file(local_data_path, extra_set)
+            svhn_imgs, svhn_labels = _load_svhn_from_file(local_data_path, use_extra_set)
             svhn_imgs = svhn_imgs.transpose((3, 0, 1, 2))
             if one_hot:
                 svhn_labels = convert_to_one_hot(svhn_labels)
@@ -254,16 +255,16 @@ def _load_mnist_from_file_old(data_dir=None):
     def read_labels(fname):
         with open(os.path.join(data_dir, fname), 'rb') as flbl:
             # remove header
-            magic, num = struct.unpack(">II", flbl.read(8))
-            labels = np.fromfile(flbl, dtype=np.int8)
-        return labels
+            struct.unpack(">II", flbl.read(8))
+            digit_labels = np.fromfile(flbl, dtype=np.int8)
+        return digit_labels
 
     def read_images(fname):
         with open(os.path.join(data_dir, fname), 'rb') as fimg:
             # remove header
             magic, num, rows, cols = struct.unpack(">IIII", fimg.read(16))
-            images = np.fromfile(fimg, dtype=np.uint8).reshape(num, -1)
-        return images
+            digit_images = np.fromfile(fimg, dtype=np.uint8).reshape(num, -1)
+        return digit_images
 
     images = np.concatenate([read_images(fname) for fname in image_files]) / 255.
     labels = np.concatenate([read_labels(fname) for fname in label_files])
@@ -409,7 +410,7 @@ def load_8schools():
     return {'effect': estimated_effects, 'stderr': std_errors}
 
 
-def load_npoints(n=4, noisy=False):
+def load_npoints(n, noisy=False, n_variations=1):
     """
     Load a generalisation of the 4 points synthetic dataset as described in the Experiments section, Generative models, 
     Synthetic example in "Adversarial Variational Bayes, L. Mescheder et al., 2017". 
@@ -417,6 +418,7 @@ def load_npoints(n=4, noisy=False):
     Args:
         n: int, number of distinct data points (i.e. dimensionality of the (vector) space in which they reside)
         noisy: bool, whether small Gaussian noise should be added to the dataset(s)
+        n_variations: int, number of samples per class (for the noisy case only)
         
     Returns:
         A dict with keys `data` and `target` containing the data points and the corresponding labels or a list of
@@ -428,10 +430,15 @@ def load_npoints(n=4, noisy=False):
     datasets = []
     for dim in n:
         data = np.eye(dim)
+        labels = np.arange(dim)
         if noisy:
-            data = data + 0.1 * np.random.standard_normal(data.shape)
+            if n_variations > 1:
+                data = np.repeat(data, n_variations, axis=0)
+                labels = np.repeat(labels, n_variations, axis=0)
+            flattened_view = data.ravel()
+            flattened_view[flattened_view == 0] = 0.2 + 0.1 * np.random.standard_normal(data.size - dim * n_variations)
             data = np.clip(data, 0, 1)
-        datasets.append({'data': data, 'target': np.arange(dim)})
+        datasets.append({'data': data, 'target': labels})
     if len(datasets) == 1:
         # unlist the result
         return datasets[0]
