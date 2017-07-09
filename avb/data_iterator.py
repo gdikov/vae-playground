@@ -98,7 +98,6 @@ class AVBDataIterator(DataIterator):
                 yield data[batch_indices].astype(np.float32)
 
 
-
 VAEDataIterator = AVBDataIterator
 
 
