@@ -98,12 +98,9 @@ class AVBDataIterator(DataIterator):
                 yield data[batch_indices].astype(np.float32)
 
 
-VAEDataIterator = AVBDataIterator
-
-
-class ConjointVAEDataIterator(DataIterator):
+class ConjointAVBDataIterator(DataIterator):
     def __init__(self, data_dim, latent_dim, seed=7):
-        super(ConjointVAEDataIterator, self).__init__(seed=seed, data_dim=data_dim, latent_dim=latent_dim)
+        super(ConjointAVBDataIterator, self).__init__(seed=seed, data_dim=data_dim, latent_dim=latent_dim)
 
     def iter_data_training(self, data, n_batches, **kwargs):
         group_by_target = kwargs.get('group_by_target', True)
@@ -152,3 +149,7 @@ class ConjointVAEDataIterator(DataIterator):
         while True:
             for batch_indices in np.split(np.arange(data_size), n_batches):
                 yield data[batch_indices].astype(np.float32)
+
+
+ConjointVAEDataIterator = ConjointAVBDataIterator
+VAEDataIterator = AVBDataIterator

@@ -345,20 +345,20 @@ def mnist_adaptive_prior_discriminator(data_dim, latent_dim):
     return discriminator_model
 
 
-def mnist_discriminator_simple(data_dim, latent_dim):
-    data_input = Input(shape=(data_dim,), name='disc_internal_data_input')
+def mnist_discriminator_simple(data_dim, latent_dim, name_prefix=''):
+    data_input = Input(shape=(data_dim,), name=name_prefix + 'disc_internal_data_input')
     # center the data around 0 in [-1, 1] as it is in [0, 1].
-    centered_data = Lambda(lambda x: 2 * x - 1, name='disc_centering_data_input')(data_input)
-    discriminator_body_data = repeat_dense(centered_data, n_layers=3, n_units=512, name_prefix='disc_body_data')
+    centered_data = Lambda(lambda x: 2 * x - 1, name=name_prefix + 'disc_centering_data_input')(data_input)
+    discriminator_body_data = repeat_dense(centered_data, n_layers=4, n_units=512, name_prefix=name_prefix + '_data')
 
-    latent_input = Input(shape=(latent_dim,), name='disc_internal_latent_input')
-    discriminator_body_latent = repeat_dense(latent_input, n_layers=4, n_units=512, name_prefix='disc_body_latent')
+    latent_input = Input(shape=(latent_dim,), name=name_prefix + 'disc_internal_latent_input')
+    discriminator_body_latent = repeat_dense(latent_input, n_layers=4, n_units=512, name_prefix=name_prefix + '_latent')
 
-    discriminator_output = Dot(axes=-1, name='disc_dot_sigma_theta')([discriminator_body_data,
-                                                                      discriminator_body_latent])
+    discriminator_output = Dot(axes=-1, name=name_prefix + 'disc_dot_sigma_theta')([discriminator_body_data,
+                                                                                    discriminator_body_latent])
 
     discriminator_model = Model(inputs=[data_input, latent_input], outputs=discriminator_output,
-                                name='disc_internal_model')
+                                name=name_prefix + 'disc_internal_model')
     return discriminator_model
 
 

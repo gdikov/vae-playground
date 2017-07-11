@@ -6,6 +6,7 @@ from keras.layers import Lambda, Dense, Concatenate
 from keras.models import Model, Input
 
 from .architectures import get_network_by_name
+from .generic_layer_utils import slice_vector
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +107,10 @@ class ConjointDecoder(object):
     A ConjointDecoder model takes multiple latent dimensions and from each generates a data output. There is also a
     shared latent input which is used by all decoders:
 
-               Latent_1   Latent_shared   Latent_1
-                  |       /           \      |
+               Latent_1 -- Latent_2 -- Latent_shared <-- concatenated
+                         /              \
+        Latent_1-Latent_shared     Latent_2-Latent_shared
+                  |                         |
              -------------             -------------
              | Decoder_1 |             | Decoder_2 |
              -------------             -------------
@@ -142,25 +145,18 @@ class ConjointDecoder(object):
         data_inputs = [Input(shape=(d,), name='dec_data_input_{}'.format(i)) for i, d in enumerate(data_dims)]
         latent_input = Input(shape=(sum(latent_dims),), name='dec_latent_input')
 
-        # evt. set the output_shape arg.
-        def slice_latent(x, start=0, stop=None):
-            if stop is None:
-                return x[:, start:]
-            else:
-                return x[:, start:stop]
-        shared_latent_factors = Lambda(slice_latent, arguments={'start': -latent_dims[-1], 'stop': None},
+        shared_latent_factors = Lambda(slice_vector, arguments={'start': -latent_dims[-1], 'stop': None},
                                        name='dec_slice_shared_lat')(latent_input)
-
         sampling_outputs, log_probs = [], []
         stop_id = 0
         for i in range(len(data_dims)):
             start_id = stop_id
             stop_id += latent_dims[i]
-            latent_i = Lambda(slice_latent, arguments={'start': start_id, 'stop': stop_id},
+            latent_i = Lambda(slice_vector, arguments={'start': start_id, 'stop': stop_id},
                               name='dec_slice_{}'.format(i))(latent_input)
             latent_i = Concatenate(axis=-1, name='dec_merged_latent_{}'.format(i))([latent_i, shared_latent_factors])
             generator_body = get_network_by_name['conjoint_decoder'][network_architecture](latent_i,
-                                                                                           'conj_{}'.format(i))
+                                                                                           'dec_conj_{}'.format(i))
             sampler_params = Dense(data_dims[i], activation='sigmoid',
                                    name='dec_sampler_params_{}'.format(i))(generator_body)
             # probability clipping is necessary for the Bernoulli `log_prob` property produces NaNs in the limit cases
