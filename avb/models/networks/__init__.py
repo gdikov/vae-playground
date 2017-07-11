@@ -1,4 +1,4 @@
 from .decoder import StandardDecoder, ConjointDecoder
-from .discriminator import Discriminator, AdaptivePriorDiscriminator
+from .discriminator import Discriminator, AdaptivePriorDiscriminator, ConjointDiscriminator
 from .encoder import StandardEncoder, ReparametrisedGaussianEncoder, \
-    MomentEstimationEncoder, ReparametrisedGaussianConjointEncoder
+    MomentEstimationEncoder, ReparametrisedGaussianConjointEncoder, StandardConjointEncoder

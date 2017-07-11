@@ -268,3 +268,53 @@ class ConjointVAEModelTrainer(ModelTrainer):
         """
         loss_hisotry = self.model.fit(data, batch_size, epochs=epochs)
         return loss_hisotry
+
+
+class ConjointAVBModelTrainer(ModelTrainer):
+    """
+    ModelTrainer class for the Conjoint Variational Autoencoder.
+    """
+
+    def __init__(self, data_dims, latent_dims, noise_dim, experiment_name, architecture,
+                 schedule=None, pretrained_dir=None, overwrite=True, use_adaptive_contrast=False,
+                 noise_basis_dim=None, optimiser_params=None):
+        """
+        Args:
+            data_dims: tuple, all flattened data dimensionalities for each dataset
+            latent_dims: tuple, all private and the shared latent dimensionalities for each dataset
+            noise_dim: int, flattened noise dimensionality
+            experiment_name: str, name of the training/experiment for logging purposes
+            architecture: str, name of the network architecture to be used
+            schedule: dict, schedule of training discriminator and encoder-decoder networks
+            overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
+            use_adaptive_contrast: bool, whether to train according to the Adaptive Contrast algorithm
+            noise_basis_dim: int, the dimensionality of the noise basis vectors if AC is used.
+            optimiser_params: dict, parameters for the optimiser
+            pretrained_dir: str, directory from which pre-trained models (hdf5 files) can be loaded
+        """
+        conj_avb = ConjointAdversarialVariationalBayes(data_dims=data_dims, latent_dims=latent_dims, noise_dim=noise_dim,
+                                                       noise_basis_dim=noise_basis_dim,
+                                                       use_adaptive_contrast=use_adaptive_contrast,
+                                                       optimiser_params=optimiser_params,
+                                                       resume_from=pretrained_dir,
+                                                       experiment_architecture=architecture)
+        self.schedule = schedule or {'iter_discr': 1, 'iter_encdec': 1}
+        super(ConjointAVBModelTrainer, self).__init__(model=conj_avb, experiment_name=experiment_name,
+                                                      overwrite=overwrite)
+
+    def fit_model(self, data, batch_size, epochs):
+        """
+        Fit the Conjoint VAE model to multiple datasets.
+
+        Args:
+            data: ndarray, training data
+            batch_size: int, batch size
+            epochs: int, number of epochs
+
+        Returns:
+
+        """
+        loss_hisotry = self.model.fit(data, batch_size, epochs=epochs,
+                                      discriminator_repetitions=self.schedule['iter_discr'],
+                                      adaptive_contrast_sampling_steps=10)
+        return loss_hisotry

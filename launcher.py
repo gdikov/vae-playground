@@ -2,7 +2,7 @@ from numpy import save as save_array
 from os.path import join as path_join
 from numpy import repeat, asarray
 from avb.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
-from avb.model_trainer import ConjointVAEModelTrainer
+from avb.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
 from avb.utils.datasets import load_npoints, load_mnist
 from avb.utils.logger import logger
 from keras.backend import clear_session
@@ -14,7 +14,7 @@ from keras.backend import clear_session
 # set_session(tf.Session(config=config))
 
 
-def run_synthetic_experiment():
+def run_synthetic_experiment(pretrained_model=None):
     logger.info("Starting a conjoint model experiment on the synthetic dataset.")
     data_dims = (4, 4)
     latent_dims = (2, 2, 2)
@@ -34,7 +34,8 @@ def run_synthetic_experiment():
 
     trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
                                       experiment_name='synthetic', architecture='synthetic',
-                                      overwrite=True, optimiser_params={'lr': 0.001})
+                                      overwrite=True, optimiser_params={'lr': 0.001},
+                                      pretrained_dir=pretrained_model)
 
     model_dir = trainer.run_training(data, batch_size=600, epochs=1000)
     trained_model = trainer.get_model()
@@ -67,23 +68,33 @@ def run_synthetic_experiment():
     return model_dir
 
 
-def run_mnist_experiment(pretrained_model=None):
+def run_mnist_experiment(model='avb', pretrained_model=None):
     logger.info("Starting a conjoint model experiment on the MNIST Variations dataset.")
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
     data_0 = load_mnist(one_hot=False, binarised=False, background=None, rotated=False)
     data_1 = load_mnist(one_hot=False, binarised=False, background='image', rotated=False)
-    train_data = ({'data': data_0['data'][:-1000], 'target': data_0['target'][:-1000]},
-                  {'data': data_1['data'][:-1000], 'target': data_1['target'][:-1000]})
+    train_data = ({'data': data_0['data'][:-1000][:100], 'target': data_0['target'][:-1000][:100]},
+                  {'data': data_1['data'][:-1000][:100], 'target': data_1['target'][:-1000][:100]})
     test_data = ({'data': data_0['data'][-1000:], 'target': data_0['target'][-1000:]},
                  {'data': data_1['data'][-1000:], 'target': data_1['target'][-1000:]})
 
-    trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
-                                      experiment_name='mnist_variations', architecture='mnist',
-                                      overwrite=True, optimiser_params={'lr': 0.001, 'beta_1': 0.5},
-                                      pretrained_dir=pretrained_model)
+    if model == 'vae':
+        trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
+                                          experiment_name='mnist_variations', architecture='mnist',
+                                          overwrite=True, optimiser_params={'lr': 0.001, 'beta_1': 0.5},
+                                          pretrained_dir=pretrained_model)
+    elif model == 'avb':
+        trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=16,
+                                          use_adaptive_contrast=False,
+                                          optimiser_params=None,
+                                          pretrained_dir=pretrained_model,
+                                          architecture='mnist',
+                                          experiment_name='mnist_variations')
+    else:
+        raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000, save_interrupted=True)
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000, save_interrupted=False)
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
 
@@ -116,4 +127,4 @@ def run_mnist_experiment(pretrained_model=None):
 
 
 if __name__ == '__main__':
-    run_mnist_experiment()#pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')
+    run_mnist_experiment(model='avb')#pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')

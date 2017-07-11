@@ -89,6 +89,71 @@ class StandardEncoder(BaseEncoder):
         return self.encoder_model(args[0])
 
 
+class StandardConjointEncoder(object):
+    """
+        A StandardConjointEncoder parametrises an arbitrary latent distribution given two (or more) datasets,
+        by partially sharing the latent vector between two (or more) encoders:
+
+              Data_1                      Data_2
+                |                           |
+           -------------              -------------
+           | Encoder_1 |              | Encoder_2 |
+           -------------              -------------
+                |                           |
+            Latent_1 -- Latent_shared -- Latent_2
+            \_______________  __________________/
+                            V
+                   concatenated latent space
+
+        """
+
+    def __init__(self, data_dims, noise_dim, latent_dims, network_architecture='synthetic'):
+        """
+        Args:
+            data_dims: tuple, flattened data dimension for each dataset
+            noise_dim: int, flattened noise dimensionality
+            latent_dims: tuple, flattened latent dimensions for each private latent space and the dimension
+                of the shared space.
+            network_architecture: str, the codename of the encoder network architecture (will be the same for all)
+        """
+        assert len(latent_dims) == len(data_dims) + 1, \
+            "Expected too receive {} private latent spaces and one shared for {} data inputs " \
+            "but got {} instead.".format(len(data_dims) + 1, len(data_dims), len(latent_dims))
+
+        name = 'Standard Conjoint Encoder'
+        logger.info("Initialising {} model with {}-dimensional data inputs "
+                    "and {}-dimensional latent outputs (last one is shared)".format(name, data_dims, latent_dims))
+
+        latent_space, features = [], []
+        inputs = [Input(shape=(dim,), name="enc_data_input_{}".format(i)) for i, dim in enumerate(data_dims)]
+        standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler')
+        standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'add'}
+        for i, inp in enumerate(inputs):
+            noise_input = standard_normal_sampler(inp)
+            feature = get_network_by_name['conjoint_encoder'][network_architecture](noise_input,
+                                                                                    'enc_feat_{}'.format(i))
+            latent_factors = Dense(latent_dims[i], activation=None, name='enc_laten_priv_{}'.format(i))(feature)
+            latent_space.append(latent_factors)
+            features.append(feature)
+
+        merged_features = Concatenate(axis=-1, name='enc_conc_features')(features)
+        shared_latent = Dense(latent_dims[-1], activation=None, name='enc_shared_latent')(merged_features)
+        latent_space = Concatenate(axis=-1, name='enc_concat_all_features')(latent_space + [shared_latent])
+        self.encoder_model = Model(inputs=inputs, outputs=latent_space, name='encoder')
+
+    def __call__(self, *args, **kwargs):
+        """
+        Make the encoder callable on a list of data inputs.
+
+        Args:
+            *args: list or tuple, Keras input tensors for the data arrays from each dataset
+
+        Returns:
+            The output of the model called on the input tensor (total, i.e. private and shared latent space)
+        """
+        return self.encoder_model(args[0])
+
+
 class MomentEstimationEncoder(BaseEncoder):
     """
     An Encoder model is trained to parametrise an arbitrary posterior approximate distribution given some 
