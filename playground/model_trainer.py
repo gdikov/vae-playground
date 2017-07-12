@@ -7,8 +7,11 @@ from datetime import datetime
 import os
 from numpy import argmin, savez, asscalar
 
+
+import matplotlib.pyplot as plt
 from playground.models import *
 from playground.utils.config import load_config
+
 
 config = load_config('global_config.yaml')
 logger = logging.getLogger(__name__)
@@ -111,6 +114,8 @@ class ModelTrainer(object):
         try:
             loss_history = self.fit_model(data, batch_size, epochs)
             endmodel_dir = os.path.join(self.experiment_dir, 'final')
+            plt.plot(loss_history['conjoint_vae_loss'])
+            plt.savefig('losshistory.png')
             self.model.save(endmodel_dir)
         except KeyboardInterrupt:
             if save_interrupted:

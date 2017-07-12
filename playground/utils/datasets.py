@@ -436,7 +436,7 @@ def load_npoints(n, noisy=False, n_variations=1):
         n: int, number of distinct data points (i.e. dimensionality of the (vector) space in which they reside)
         noisy: bool, whether small Gaussian noise should be added to the dataset(s)
         n_variations: int, number of samples per class (for the noisy case only)
-        
+
     Returns:
         A dict with keys `data` and `target` containing the data points and the corresponding labels or a list of
         multiple such dataset dicts.
@@ -446,8 +446,11 @@ def load_npoints(n, noisy=False, n_variations=1):
     # else assume that it is a list or tuple of dimensionalities
     datasets = []
     for dim in n:
-        data = np.eye(dim)
-        labels = np.arange(dim)
+        leftdata = np.repeat(np.eye(dim), 4, axis=0)
+        rightdata = np.tile(np.eye(dim), (4, 1))
+        data = np.concatenate((leftdata, rightdata), axis=1)
+        labels = np.repeat(np.arange(dim), 4, axis=0)
+        private_labels = np.tile(np.arange(dim), (1, 4))
         if noisy:
             if n_variations > 1:
                 data = np.repeat(data, n_variations, axis=0)
@@ -455,7 +458,7 @@ def load_npoints(n, noisy=False, n_variations=1):
             flattened_view = data.ravel()
             flattened_view[flattened_view == 0] = 0.2 + 0.1 * np.random.standard_normal(data.size - dim * n_variations)
             data = np.clip(data, 0, 1)
-        datasets.append({'data': data, 'target': labels})
+        datasets.append({'data': data, 'target': labels, 'privatelatent': private_labels})
     if len(datasets) == 1:
         # unlist the result
         return datasets[0]

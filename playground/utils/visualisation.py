@@ -132,6 +132,11 @@ def plot_reconstructed_data(data, reconstructed_data, fig_dirpath=None, fig_name
     fig_name = fig_name or 'reconstructed_samples.png'
     if not fig_name.endswith('.png'):
         fig_name += '.png'
+    if fig_dirpath.endswith('synthetic'):
+        #reshaping synthetic dataset to enable plotting
+        idx = np.repeat(8, 8)
+        data = np.insert(data, idx, 0, axis=1)
+        reconstructed_data = np.insert(reconstructed_data, idx, 0, axis=1)
     data_dim = data.shape[1]
     sample_side_size = int(np.sqrt(data_dim))
     reconstructed_data = reconstructed_data.reshape(-1, sample_side_size, sample_side_size)
