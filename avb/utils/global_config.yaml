@@ -1,0 +1,13 @@
+
+seed: 7
+data_dir: data
+output_dir: output
+logs_dir: output/logs
+temp_dir: output/tmp
+
+
+
+
+
+
+
