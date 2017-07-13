@@ -20,7 +20,7 @@ from .config import load_config
 logger = logging.getLogger(__name__)
 config = load_config("global_config.yaml")
 
-PROJECT_DATA_DIR = config['data_dir']
+DATA_DIR = config['data_dir']
 np.random.seed(config['seed'])
 
 
@@ -35,7 +35,7 @@ def load_usps(local_data_path=None):
         A dict with `data` and `target` keys with the USPS data grayscale images.
     """
 
-    usps_path = os.path.join(PROJECT_DATA_DIR, "USPS")
+    usps_path = os.path.join(DATA_DIR, "USPS")
     if local_data_path is None and not os.path.exists(usps_path):
         logger.info("Path to locally stored data not provided. Proceeding with downloading the USPS dataset.")
         url = 'http://www.cs.nyu.edu/~roweis/data/usps_all.mat'
@@ -106,7 +106,7 @@ def load_svhn(local_data_path=None, one_hot=True, grayscale=True, use_extra_set=
         gray_data = color.rgb2gray(raw_data)
         return gray_data
 
-    svhn_path = os.path.join(PROJECT_DATA_DIR, "SVHN")
+    svhn_path = os.path.join(DATA_DIR, "SVHN")
     if local_data_path is None and not os.path.exists(svhn_path):
         logger.info("Path to locally stored data not provided. Proceeding with downloading the SVHN dataset.")
         url = 'http://ufldl.stanford.edu/housenumbers/train_32x32.mat'
@@ -206,7 +206,7 @@ def load_mnist_old(local_data_path=None, one_hot=True, binarised=True):
     #
     # However this dataset does not contain label information and hence it is better go binarise it manually.
 
-    mnist_path = os.path.join(PROJECT_DATA_DIR, "MNIST_old")
+    mnist_path = os.path.join(DATA_DIR, "MNIST_old")
     if local_data_path is None and not os.path.exists(mnist_path):
         logger.info("Path to locally stored data not provided. Proceeding with downloading the MNIST dataset.")
         from tensorflow.examples.tutorials.mnist import input_data
@@ -332,7 +332,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
             threshold = kwargs.get('threshold', 0.5)
             return (raw_data > threshold).astype(np.int32)
 
-    mnist_path = os.path.join(PROJECT_DATA_DIR, mnist_style)
+    mnist_path = os.path.join(DATA_DIR, mnist_style)
 
     if local_data_path is None and not os.path.exists(mnist_path):
         local_data_path = mnist_path
