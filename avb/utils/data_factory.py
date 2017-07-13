@@ -1,6 +1,7 @@
 from __future__ import division
 from __future__ import absolute_import
 
+import logging
 import os
 import numpy as np
 
@@ -10,7 +11,15 @@ from skimage.transform import resize
 
 from .datasets import load_mnist
 
-TEXTURES_DIR = os.path.join('..', '..', 'data', 'textures')
+from .config import load_config
+
+logger = logging.getLogger(__name__)
+config = load_config("global_config.yaml")
+
+DATA_DIR = config['data_dir']
+TEXTURES_DIR = os.path.join(DATA_DIR, 'textures')
+
+np.random.seed(config['seed'])
 
 
 class PatternFactory(object):
@@ -27,7 +36,8 @@ class PatternFactory(object):
         pattern = (np.array((r, g, b)) * 128 + 127).transpose(1, 2, 0).astype(np.uint8)
         if as_gray:
             pattern = color.rgb2gray(pattern)
-        return pattern
+        tag = 'trippy'
+        return {'image': pattern, 'tag': tag}
 
     @staticmethod
     def render_strippy(shape, orientation='horizontal', width=1, height=1, as_gray=False):
@@ -40,11 +50,14 @@ class PatternFactory(object):
             repeats_to_fit = int(np.ceil(shape[0] / 2 / height))
             col = np.array([[1] * height, [0] * height] * repeats_to_fit).ravel()[None, :]
             pattern = np.repeat(col, shape[1], axis=0).T
+            tag = 'strippy_horizontal'
         elif orientation == 'vertical':
             repeats_to_fit = int(np.ceil(shape[1] / 2 / width))
             row = np.array([[1] * width, [0] * width] * repeats_to_fit).ravel()[None, :]
             pattern = np.repeat(row, shape[0], axis=0)
+            tag = 'strippy_vertical'
         elif orientation == 'diagonal':
+            tag = 'strippy_diagonal'
             raise NotImplementedError
         elif orientation == 'checker':
             assert shape[0] / 2 / height > 0 and shape[1] / 2 / width > 0, "Invalid shape and block width/height."
@@ -54,17 +67,18 @@ class PatternFactory(object):
             row_2 = np.array([[0]*width, [1]*width]*repeats).ravel()[None, :]
             two_rows = np.repeat(np.vstack([row_1, row_2]), height, axis=0)
             pattern = np.tile(two_rows.T, int(np.ceil(shape[0] / 2 / height)))
+            tag = 'strippy_checker'
         else:
             raise ValueError("Unknown orientation")
 
         pattern = pattern[:shape[0], :shape[1]]
-        return pattern
+        return {'image': pattern, 'tag': tag}
 
     @staticmethod
     def render_mandelbrot(shape, as_gray=False):
-        xmin, xmax, ymin, ymax, (height, width), maxiter = -1.5, 0.5, -1.5, 1.5, shape, 10000
+        xmin, xmax, ymin, ymax, height, width, maxiter = -1.5, 0.5, -1.5, 1.5, 200, 200, 1000
 
-        def mandelbrot_numpy(c, maxiter):
+        def mandelbrot(c, maxiter):
             output = np.zeros(c.shape)
             z = np.zeros(c.shape, np.complex64)
             for it in range(maxiter):
@@ -74,19 +88,23 @@ class PatternFactory(object):
             output[output == maxiter - 1] = 0
             return output
 
-        r1 = np.linspace(-2, -2, width, dtype=np.float32)
-        r2 = np.linspace(-2, -2, height, dtype=np.float32)
+        r1 = np.linspace(xmin, xmax, width, dtype=np.float32)
+        r2 = np.linspace(ymin, ymax, height, dtype=np.float32)
         c = r1 + r2[:, None] * 1j
-        pattern = mandelbrot_numpy(c, maxiter).T
+        pattern = mandelbrot(c, maxiter).T
         if as_gray:
             pattern = color.rgb2gray(pattern)
-        return pattern
+            pattern = (pattern - pattern.min()) / pattern.max()
+        pattern = resize(pattern, shape, order=3)
+        tag = 'mandelbrot'
+        return {'image': pattern, 'tag': tag}
 
     @staticmethod
     def render_image(shape, image_filename, as_gray=False):
         pattern = imread(os.path.join(TEXTURES_DIR, image_filename), as_grey=as_gray)
-        pattern = resize(pattern, shape, order=2)
-        return pattern
+        pattern = resize(pattern, shape, order=3)
+        tag = os.path.splitext(os.path.basename(image_filename))[0]
+        return {'image': pattern, 'tag': tag}
 
     def get_styles(self):
         return self.styles
@@ -108,21 +126,30 @@ class CustomMNIST(object):
 
         self.pattern_generator = PatternFactory()
         self.styles = self.pattern_generator.get_styles()
+        self.cache = {}
 
-    def _generate_style(self, style):
+    def _generate_style(self, style, **kwargs):
+        self.cache = {}
+        as_gray = kwargs.get('as_gray', True)
+        if style in self.cache.keys():
+            return self.cache[style]
         if style == 0:
-            background = self.pattern_generator.render_trippy((28, 28), as_gray=True)
+            background = self.pattern_generator.render_trippy((28, 28), as_gray=as_gray)
+            self.cache[style] = background
         elif style == 1:
-            background = self.pattern_generator.render_strippy((28, 28), orientation='random', as_gray=True)
+            orientation = kwargs.get('orientation', 'random')
+            background = self.pattern_generator.render_strippy((28, 28), orientation=orientation, as_gray=as_gray)
+            # it can be randomized so cache is difficult. skip it. it is fast enough.
         elif style == 2:
-            background = self.pattern_generator.render_mandelbrot((28, 28), as_gray=True)
+            background = self.pattern_generator.render_mandelbrot((28, 28), as_gray=as_gray)
+            self.cache[style] = background
         elif style == 3:
             raise NotImplementedError
         else:
             raise ValueError("Unknown style id")
         return background
 
-    def generate(self, n_samples, style_distribution=None, label_distribution=None):
+    def generate(self, n_samples, style_distribution=None, label_distribution=None, **kwargs):
         """
         Generate samples with different background styles.
 
@@ -143,18 +170,31 @@ class CustomMNIST(object):
             new_sample[~mask_digit] = new_background[~mask_digit]
             return new_sample
 
-        augmented_data = {'data': [], 'target': self.data['target']}
+        augmented_data = {'data': [], 'target': [], 'tag': []}
         if style_distribution is None:
             style_distribution = np.ones(self.styles.size) / self.styles.size
         if label_distribution is None:
             label_distribution = np.ones(self.unique_labels.size) / self.unique_labels.size
-
+        if isinstance(style_distribution, dict):
+            style_distribution = [style_distribution[s] if s in style_distribution.keys() else 0 for s in self.styles]
         s_ids = np.random.choice(self.styles.size, size=n_samples, replace=True, p=style_distribution)
         l_ids = np.random.choice(self.unique_labels.size, size=n_samples, replace=True, p=label_distribution)
         for s_id, l_id in zip(s_ids, l_ids):
-            new_sample_background = self._generate_style(style=s_id)
+            new_sample_background = self._generate_style(style=s_id, **kwargs)
             random_id = np.random.choice(len(self.grouped_data[l_id]))
-            newly_composed_digit = compose_new(new_sample_background, self.grouped_data[l_id][random_id])
+            newly_composed_digit = compose_new(new_sample_background['image'], self.grouped_data[l_id][random_id])
             augmented_data['data'].append(newly_composed_digit)
+            augmented_data['target'].append(l_id)
+            augmented_data['tag'].append(new_sample_background['tag'])
 
         return augmented_data
+
+    @staticmethod
+    def save_dataset(new_data, tag):
+        assert isinstance(new_data, dict), "Provida a dict data containing at least the keys `data` and `target`."
+        new_data_path = os.path.join(DATA_DIR, 'MNIST_Custom_Variations')
+        if not os.path.exists(new_data_path):
+            os.makedirs(new_data_path)
+        np.savez(os.path.join(new_data_path, tag), **new_data)
+        logger.info("Saved {} dataset at location: {}".format(tag, new_data_path))
+        return new_data_path
