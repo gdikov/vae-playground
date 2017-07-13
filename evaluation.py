@@ -1,7 +1,7 @@
 from numpy import load as load_array
 from os.path import join as path_join
-from avb.metrics import evidence_lower_bound, normality_of_marginal_posterior, reconstruction_error, data_log_likelihood
-from avb.utils.datasets import load_npoints, load_mnist_old
+from playground.metrics import evidence_lower_bound, normality_of_marginal_posterior, reconstruction_error, data_log_likelihood
+from playground.utils.datasets import load_npoints, load_mnist_old
 
 
 if __name__ == '__main__':

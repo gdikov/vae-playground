@@ -7,8 +7,8 @@ from datetime import datetime
 import os
 from numpy import argmin, savez, asscalar
 
-from avb.models import *
-from avb.utils.config import load_config
+from playground.models import *
+from playground.utils.config import load_config
 
 config = load_config('global_config.yaml')
 logger = logging.getLogger(__name__)

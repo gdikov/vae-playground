@@ -1,10 +1,10 @@
 from numpy import save as save_array
 from os.path import join as path_join
 from numpy import repeat, asarray
-from avb.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
-from avb.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
-from avb.utils.datasets import load_npoints, load_mnist
-from avb.utils.logger import logger
+from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
+from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
+from playground.utils.datasets import load_npoints, load_mnist
+from playground.utils.logger import logger
 from keras.backend import clear_session
 
 # import tensorflow as tf
