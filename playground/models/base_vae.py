@@ -88,8 +88,12 @@ class BaseVariationalAutoencoder(object):
             data = np.repeat(data, sampling_size, axis=0)
 
         data_iterator, n_iters = self.data_iterator.iter(data, batch_size, mode='inference')
-        latent_samples = self.inference_model.predict_generator(data_iterator, steps=n_iters)
-        return latent_samples
+        latent_samples = []
+        for i in range(n_iters):
+            batch = next(data_iterator)
+            latent_samples_batch = self.inference_model.predict_on_batch(batch)
+            latent_samples.append(latent_samples_batch)
+        return np.concatenate(latent_samples, axis=0)
 
     def generate(self, n_samples=100, batch_size=32, **kwargs):
         """
@@ -109,10 +113,7 @@ class BaseVariationalAutoencoder(object):
         return_probs = kwargs.get('return_probs', True)
         latent_samples = kwargs.get('latent_samples', None)
 
-        if latent_samples is not None:
-            data_iterator, n_iters = self.data_iterator.iter(latent_samples, batch_size=batch_size, mode='generation')
-            data_probs = self.generative_model.predict_generator(data_iterator, steps=n_iters)
-        else:
+        if latent_samples is None:
             if self.latent_dim == 2:
                 # perform 2d grid search
                 n_samples_per_axis = complex(int(np.sqrt(n_samples)))
@@ -120,8 +121,13 @@ class BaseVariationalAutoencoder(object):
                 latent_samples = standard_gaussian.ppf(uniform_grid)
             else:
                 latent_samples = np.random.standard_normal(size=(n_samples, self.latent_dim))
-            data_iterator, n_iters = self.data_iterator.iter(latent_samples, batch_size=batch_size, mode='generation')
-            data_probs = self.generative_model.predict_generator(data_iterator, steps=n_iters)
+        data_iterator, n_iters = self.data_iterator.iter(latent_samples, batch_size=batch_size, mode='generation')
+        data_probs = []
+        for i in range(n_iters):
+            batch = next(data_iterator)
+            batch_probs = self.generative_model.predict_on_batch(batch)
+            data_probs.append(batch_probs)
+        data_probs = np.concatenate(data_probs, axis=0)
         if isinstance(self.data_dim, tuple):
             data_probs = np.asarray(data_probs)
             # if the batch size is the same as the data size, then an annoying additional dimension appears. cut it.

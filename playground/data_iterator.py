@@ -94,7 +94,8 @@ class AVBDataIterator(DataIterator):
     def iter_data_generation(self, data, n_batches, **kwargs):
         data_size = data.shape[0]
         while True:
-            for batch_indices in np.split(np.arange(data_size), n_batches):
+            batches_indices = np.split(np.arange(data_size), n_batches)
+            for batch_indices in batches_indices:
                 yield data[batch_indices].astype(np.float32)
 
 
@@ -135,20 +136,31 @@ class ConjointAVBDataIterator(DataIterator):
                         group_id = int(i / (n_batches / len(unique_labels)))
                         sample_ids = np.squeeze([np.random.choice(dataset_groups[group_id], size=batch_size)
                                                  for dataset_groups in indices_groups])
-                    batch = [data[i]['data'][ids].astype(np.float32) for i, ids in enumerate(sample_ids)]
+                    batch = [data[j]['data'][ids].astype(np.float32) for j, ids in enumerate(sample_ids)]
                     yield batch
         else:
             raise NotImplementedError
 
     def iter_data_inference(self, data, n_batches, **kwargs):
+        group_by_target = kwargs.get('group_by_target', False)
         kwargs['shuffle'] = False
-        return self.iter_data_training(data, n_batches, **kwargs)
+        if group_by_target:
+            return self.iter_data_training(data, n_batches, **kwargs)
+        else:
+            # assume that the two datasets are identical in terms of size, labels and sample order
+            # and differ only in non-target information, e.g. background, texture etc.
+            assert all([d['data'].shape[0] == data[0]['data'].shape[0] for d in data[1:]]), \
+                "Datasets of unequal size cannot be iterated without grouping"
+            data_size = data[0]['data'].shape[0]
+            batches_indices = np.split(np.arange(data_size), n_batches)
+            for batch_indices in batches_indices:
+                yield [d['data'][batch_indices].astype(np.float32) for d in data]
 
     def iter_data_generation(self, data, n_batches, **kwargs):
         data_size = data.shape[0]
-        while True:
-            for batch_indices in np.split(np.arange(data_size), n_batches):
-                yield data[batch_indices].astype(np.float32)
+        batches_indices = np.split(np.arange(data_size), n_batches)
+        for batch_indices in batches_indices:
+            yield data[batch_indices].astype(np.float32)
 
 
 ConjointVAEDataIterator = ConjointAVBDataIterator
