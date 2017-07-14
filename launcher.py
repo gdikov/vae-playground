@@ -72,8 +72,12 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
     logger.info("Starting a conjoint model experiment on the MNIST Variations dataset.")
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
-    data_0 = load_mnist(one_hot=False, binarised=False, background=None, rotated=False)
-    data_1 = load_mnist(one_hot=False, binarised=False, background='image', rotated=False)
+    # data_0 = load_mnist(one_hot=False, binarised=False, background=None, rotated=False)
+    # data_1 = load_mnist(one_hot=False, binarised=False, background='image', rotated=False)
+    data_0 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_horizontal.npz',
+                        one_hot=False, binarised=False, background='custom')
+    data_1 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_vertical.npz',
+                        one_hot=False, binarised=False, background='custom')
     train_data = ({'data': data_0['data'][:-1000][:100], 'target': data_0['target'][:-1000][:100]},
                   {'data': data_1['data'][:-1000][:100], 'target': data_1['target'][:-1000][:100]})
     test_data = ({'data': data_0['data'][-1000:], 'target': data_0['target'][-1000:]},
@@ -127,4 +131,4 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
 
 
 if __name__ == '__main__':
-    run_mnist_experiment(model='avb')#pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')
+    run_mnist_experiment(model='vae')#pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')

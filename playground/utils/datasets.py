@@ -289,6 +289,35 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     Returns:
         A dict with `data` and `target` keys with the MNIST data converted to [0, 1] floats. 
     """
+    # TODO: refactor this function -- use single load call so that logger messages are not repeated for custom dataset
+    def convert_to_one_hot(raw_target):
+        n_uniques = len(np.unique(raw_target))
+        one_hot_target = np.zeros((raw_target.shape[0], n_uniques))
+        one_hot_target[np.arange(raw_target.shape[0]), raw_target.astype(np.int)] = 1
+        return one_hot_target
+
+    def binarise(raw_data, mode='sampling', **kwargs):
+        if mode == 'sampling':
+            return np.random.binomial(1, p=raw_data).astype(np.int32)
+        elif mode == 'threshold':
+            threshold = kwargs.get('threshold', 0.5)
+            return (raw_data > threshold).astype(np.int32)
+
+    if background == 'custom':
+        logger.info("Loading custom MNIST dataset from {}".format(local_data_path))
+        if local_data_path is None:
+            raise ValueError("When loading customized MNIST provide the data path too.")
+        if rotated or large_set:
+            logger.warning("Further arguments such as `rotated` or `large_set` will have no effect on the custom MNIST")
+        custom_dataset = np.load(local_data_path)
+        if binarised:
+            custom_dataset['data'] = binarise(custom_dataset['data'], mode='threshold')
+        if one_hot:
+            custom_dataset['target'] = convert_to_one_hot(custom_dataset['target'])
+        custom_dataset = {k: custom_dataset[k] for k in custom_dataset.keys()}
+        custom_dataset['data'] = custom_dataset['data'].reshape((-1, 784))
+        return custom_dataset
+
     train_filename = None
     test_filename = None
     if not rotated:
@@ -299,7 +328,7 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
         elif background == 'noise':
             url = 'http://www.iro.umontreal.ca/~lisa/icml2007data/mnist_background_random.zip'
         else:
-            logger.error("Background must be either 'None', 'image' or 'noise'")
+            logger.error("Background must be either 'None', 'image', 'noise' or 'custom'.")
             raise ValueError
     else:
         if background is None or background == 'none':
@@ -318,19 +347,6 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
     if not train_filename:
         train_filename = mnist_style+'_train'+'.amat'
         test_filename = mnist_style+'_test'+'.amat'
-
-    def convert_to_one_hot(raw_target):
-        n_uniques = len(np.unique(raw_target))
-        one_hot_target = np.zeros((raw_target.shape[0], n_uniques))
-        one_hot_target[np.arange(raw_target.shape[0]), raw_target.astype(np.int)] = 1
-        return one_hot_target
-
-    def binarise(raw_data, mode='sampling', **kwargs):
-        if mode == 'sampling':
-            return np.random.binomial(1, p=raw_data).astype(np.int32)
-        elif mode == 'threshold':
-            threshold = kwargs.get('threshold', 0.5)
-            return (raw_data > threshold).astype(np.int32)
 
     mnist_path = os.path.join(DATA_DIR, mnist_style)
 
