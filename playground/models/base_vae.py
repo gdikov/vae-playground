@@ -121,18 +121,19 @@ class BaseVariationalAutoencoder(object):
                 latent_samples = standard_gaussian.ppf(uniform_grid)
             else:
                 latent_samples = np.random.standard_normal(size=(n_samples, self.latent_dim))
+
         data_iterator, n_iters = self.data_iterator.iter(latent_samples, batch_size=batch_size, mode='generation')
         data_probs = []
         for i in range(n_iters):
             batch = next(data_iterator)
             batch_probs = self.generative_model.predict_on_batch(batch)
             data_probs.append(batch_probs)
-        data_probs = np.concatenate(data_probs, axis=0)
+
         if isinstance(self.data_dim, tuple):
-            data_probs = np.asarray(data_probs)
-            # if the batch size is the same as the data size, then an annoying additional dimension appears. cut it.
-            if data_probs.ndim == 4 and data_probs.shape[1] == 1:
-                data_probs = np.squeeze(data_probs, axis=1)
+            data_probs = np.concatenate(data_probs, axis=1)
+        else:
+            data_probs = np.concatenate(data_probs, axis=0)
+
         if return_probs:
             return data_probs
         sampled_data = np.random.binomial(1, p=data_probs)

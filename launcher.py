@@ -78,10 +78,10 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
                         one_hot=False, binarised=False, background='custom')
     data_1 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_vertical.npz',
                         one_hot=False, binarised=False, background='custom')
-    train_data = ({'data': data_0['data'][:-1000][:100], 'target': data_0['target'][:-1000][:100]},
-                  {'data': data_1['data'][:-1000][:100], 'target': data_1['target'][:-1000][:100]})
-    test_data = ({'data': data_0['data'][-1000:], 'target': data_0['target'][-1000:]},
-                 {'data': data_1['data'][-1000:], 'target': data_1['target'][-1000:]})
+    train_data = ({'data': data_0['data'][:-100], 'target': data_0['target'][:-100]},
+                  {'data': data_1['data'][:-100], 'target': data_1['target'][:-100]})
+    test_data = ({'data': data_0['data'][-100:], 'target': data_0['target'][-100:]},
+                 {'data': data_1['data'][-100:], 'target': data_1['target'][-100:]})
 
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
@@ -131,4 +131,4 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
 
 
 if __name__ == '__main__':
-    run_mnist_experiment(model='vae')#pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')
+    run_mnist_experiment(model='vae', pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')
