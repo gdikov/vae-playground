@@ -190,7 +190,7 @@ class ConjointDiscriminator(object):
         self.latent_inputs = Input(shape=(sum(latent_dims),), name='disc_latent_inp')
 
         shared_latent_factors = Lambda(slice_vector, arguments={'start': -latent_dims[-1], 'stop': None},
-                                       name='dec_slice_shared_lat')(self.latent_inputs)
+                                       name='disc_slice_shared_lat')(self.latent_inputs)
         self.prior_sampler = Lambda(sample_adaptive_normal_noise, name='disc_prior_sampler')
         self.prior_sampler.arguments = {'latent_dim': max(latent_dims[:-1]) + latent_dims[-1], 'seed': config['seed']}
         noise = self.prior_sampler(self.data_inputs[0])
@@ -211,7 +211,7 @@ class ConjointDiscriminator(object):
 
             latent_i = Lambda(slice_vector, arguments={'start': start_id, 'stop': stop_id},
                               name='disc_slice_{}'.format(i))(self.latent_inputs)
-            latent_i = Concatenate(axis=-1, name='dec_merged_latent_{}'.format(i))([latent_i, shared_latent_factors])
+            latent_i = Concatenate(axis=-1, name='disc_merged_latent_{}'.format(i))([latent_i, shared_latent_factors])
             from_posterior_outputs.append(disc_body([self.data_inputs[i], latent_i]))
 
         from_prior_output = Add(name='disc_add_prior_outputs')(from_prior_outputs)
