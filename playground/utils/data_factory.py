@@ -43,7 +43,9 @@ class PatternFactory(object):
     def render_strippy(shape, orientation='horizontal', width=1, height=1, as_gray=False):
         if not as_gray:
             raise NotImplementedError
-        if orientation == 'random':
+        if orientation == 'vertical_or_horizontal':
+            orientation = np.random.choice(['horizontal', 'vertical'])
+        elif orientation == 'random':
             orientation = np.random.choice(['horizontal', 'vertical', 'checker'])
         if orientation == 'horizontal':
             assert shape[0] // 2 // height > 0, "Invalid shape and block height."
