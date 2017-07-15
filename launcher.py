@@ -78,16 +78,18 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
     if not two_backgrounds_per_encoder:
+        experiment_name = 'mnist_variation'
         data_0 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_horizontal.npz',
                             one_hot=False, binarised=False, background='custom')
         data_1 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_vertical.npz',
                             one_hot=False, binarised=False, background='custom')
     elif two_backgrounds_per_encoder:
+        experiment_name = 'mnist_variation_two_backgrounds_per_encoder'
         local_path_0 = 'data/MNIST_Custom_Variations/strippy_horizontal_and_vertical.npz'
         local_path_1 = 'data/MNIST_Custom_Variations/trippy_and_mandelbrot.npz'
         if not isfile(local_path_0):
             cmnist = CustomMNIST()
-            new_data = cmnist.generate(1000, [0, 1, 0, 0])
+            new_data = cmnist.generate(1000, [0, 1, 0, 0],orientation = 'vertical_or_horizontal')
             cmnist.save_dataset(new_data, 'strippy_horizontal_and_vertical')
         data_0 = load_mnist(local_path_0, one_hot=False, binarised=False, background='custom')
         if not isfile(local_path_1):
@@ -103,7 +105,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
 
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
-                                          experiment_name='mnist_variations', architecture='mnist',
+                                          experiment_name=experiment_name, architecture='mnist',
                                           overwrite=True, optimiser_params={'lr': 0.001, 'beta_1': 0.5},
                                           pretrained_dir=pretrained_model)
     elif model == 'avb':
@@ -112,11 +114,11 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
                                           optimiser_params=None,
                                           pretrained_dir=pretrained_model,
                                           architecture='mnist',
-                                          experiment_name='mnist_variations')
+                                          experiment_name=experiment_name)
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000, save_interrupted=False)
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=10, save_interrupted=False)
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
 
