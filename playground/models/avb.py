@@ -315,3 +315,18 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
             history['discriminator_loss'].append(epoch_loss_history_disc)
 
         return history
+
+    def cross_domain_reconstruct(self, data, primary_domain, batch_size=32, **kwargs):
+        """
+        Given multiple data samples from different datasets, reconstruct a single sample from the shared
+        and the private latent spaces of the primary domain data sample.
+
+        Args:
+            data: ndarray, data array containing pairs of samples from each domain
+            primary_domain: int, id of the domain whose private latent factor encoding should be taken
+            batch_size: int, number of samples to be processed at once
+
+        Returns:
+            An array of the primary domain reconstructions.
+        """
+        raise NotImplementedError

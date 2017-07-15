@@ -108,11 +108,14 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
     plot_latent_2d(latent_vars[:, -2:], repeat(train_data[0]['target'], sampling_size),
                    fig_dirpath=model_dir, fig_name='shared.png')
+    tag_to_id = [{tag: id_ for id_, tag in enumerate(set(train_data[i]['tag']))} for i in range(len(data_dims))]
+    id_tags = [asarray([tag_to_id[i][tag] for tag in repeat(train_data[i]['target'], sampling_size)])
+               for i in range(len(data_dims))]
     stop_id = 0
     for i, lat_id in enumerate(latent_dims[:-1]):
         start_id = stop_id
         stop_id += lat_id
-        plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(train_data[0]['target'], sampling_size),
+        plot_latent_2d(latent_vars[:, start_id:stop_id], id_tags[i],
                        fig_dirpath=model_dir, fig_name='private_{}'.format(i))
 
     reconstructions = trained_model.reconstruct(test_data, batch_size=100, sampling_size=1)
