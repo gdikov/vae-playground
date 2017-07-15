@@ -116,8 +116,8 @@ class ModelTrainer(object):
             if save_interrupted:
                 interrupted_dir = os.path.join(self.experiment_dir, 'interrupted_{}'.format(datetime.now().isoformat()))
                 self.model.save(interrupted_dir)
-                logger.warning("Training has been interrupted and the models "
-                               "have been dumped in {}. Exiting program.".format(interrupted_dir))
+                logger.warning("Training has been interrupted and the model "
+                               "has been dumped in {}.".format(interrupted_dir))
             else:
                 logger.warning("Training has been interrupted.")
         finally:

@@ -36,3 +36,6 @@ output
 
 # drafts and scratches
 scratch.py
+
+# local system files
+.DS_Store

@@ -208,11 +208,11 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
         self.models_dict = {'avb_trainable_discriminator': None, 'avb_trainable_encoder_decoder': None}
 
         if use_adaptive_contrast:
-            self.name = "avb_with_ac"
+            self.name = "conjoint_avb_with_ac"
             self.noise_basis_dim = noise_basis_dim
             raise NotImplementedError("AC for the conjoint AVB model is not supported yet.")
         else:
-            self.name = "avb"
+            self.name = "conjoint_avb"
             self.encoder = StandardConjointEncoder(data_dims=data_dims, noise_dim=noise_dim, latent_dims=latent_dims,
                                                    network_architecture=experiment_architecture)
             self.discriminator = ConjointDiscriminator(data_dims=data_dims, latent_dims=latent_dims,
