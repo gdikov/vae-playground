@@ -74,7 +74,8 @@ def run_synthetic_experiment(model='avb', pretrained_model=None):
     return model_dir
 
 
-def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per_encoder=True, color_tags=True):
+def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per_encoder=True, color_tags=True,
+                         small_set=False):
     logger.info("Starting a conjoint model experiment on the MNIST Variations dataset.")
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
@@ -87,16 +88,26 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
                             one_hot=False, binarised=False, background='custom')
     elif two_backgrounds_per_encoder:
         experiment_name = 'mnist_variation_two_backgrounds_per_encoder'
-        local_path_0 = 'data/MNIST_Custom_Variations/strippy_horizontal_and_vertical_small.npz'
-        local_path_1 = 'data/MNIST_Custom_Variations/trippy_and_mandelbrot_small.npz'
+        if small_set:
+            setsize = 1000
+            local_path_0 = 'data/MNIST_Custom_Variations/strippy_horizontal_and_vertical_small.npz'
+            local_path_1 = 'data/MNIST_Custom_Variations/trippy_and_mandelbrot_small.npz'
+        else:
+            setsize = 50000
+            local_path_0 = 'data/MNIST_Custom_Variations/strippy_horizontal_and_vertical.npz'
+            local_path_1 = 'data/MNIST_Custom_Variations/trippy_and_mandelbrot.npz'
         if not isfile(local_path_0):
             cmnist = CustomMNIST()
-            new_data = cmnist.generate(1000, [0, 1, 0, 0], orientation='vertical_or_horizontal')
-            cmnist.save_dataset(new_data, 'strippy_horizontal_and_vertical_small')
+            new_data = cmnist.generate(setsize, [0, 1, 0, 0], orientation='vertical_or_horizontal')
+            save_as = 'strippy_horizontal_and_vertical'
+            if small_set: save_as += '_small'
+            cmnist.save_dataset(new_data, save_as)
         data_0 = load_mnist(local_path_0, one_hot=False, binarised=False, background='custom')
         if not isfile(local_path_1):
             cmnist = CustomMNIST()
-            new_data = cmnist.generate(1000, [0.5, 0, 0.5, 0])
+            new_data = cmnist.generate(setsize, [0.5, 0, 0.5, 0])
+            save_as = 'trippy_and_mandelbrot'
+            if small_set: save_as += '_small'
             cmnist.save_dataset(new_data, 'trippy_and_mandelbrot_small')
         data_1 = load_mnist(local_path_1, one_hot=False, binarised=False, background='custom')
 
@@ -121,7 +132,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
     if not pretrained_model:
-        model_dir = trainer.run_training(train_data, batch_size=100, epochs=1, save_interrupted=True)
+        model_dir = trainer.run_training(train_data, batch_size=100, epochs=10, save_interrupted=True)
     else:
         model_dir = 'output\\conjoint_gaussian_vae\\mnist_variation_two_backgrounds_per_encoder'
     trained_model = trainer.get_model()
@@ -146,7 +157,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
             assert len(tags_num) == len(tags)
             for k, v in tag_dict.items():
                 tags_num[tags == v] = k
-            plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(tags, sampling_size),
+            plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(tags_num, sampling_size),
                            fig_dirpath=model_dir, fig_name='private_{}'.format(i))
         else:
             plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(train_data[i]['target'], sampling_size),
@@ -168,4 +179,5 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
 
 
 if __name__ == '__main__':
-    run_mnist_experiment(model='vae', two_backgrounds_per_encoder=True)
+    run_mnist_experiment(model='vae', two_backgrounds_per_encoder=True, small_set=True, color_tags=True)
+
