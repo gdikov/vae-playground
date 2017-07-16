@@ -443,14 +443,11 @@ def load_npoints(n, noisy=False, n_variations=1):
     """
     if isinstance(n, int):
         n = tuple([n])
-    # else assume that it is a list or tuple of dimensionalities
+
     datasets = []
     for dim in n:
-        leftdata = np.repeat(np.eye(dim), 4, axis=0)
-        rightdata = np.tile(np.eye(dim), (4, 1))
-        data = np.concatenate((leftdata, rightdata), axis=1)
-        labels = np.repeat(np.arange(dim), 4, axis=0)
-        private_labels = np.tile(np.arange(dim), (1, 4))
+        data = np.eye(dim)
+        labels = np.arange(dim)
         if noisy:
             if n_variations > 1:
                 data = np.repeat(data, n_variations, axis=0)
@@ -458,9 +455,39 @@ def load_npoints(n, noisy=False, n_variations=1):
             flattened_view = data.ravel()
             flattened_view[flattened_view == 0] = 0.2 + 0.1 * np.random.standard_normal(data.size - dim * n_variations)
             data = np.clip(data, 0, 1)
-        datasets.append({'data': data, 'target': labels, 'privatelatent': private_labels})
+        datasets.append({'data': data, 'target': labels})
+
     if len(datasets) == 1:
         # unlist the result
         return datasets[0]
+    return tuple(datasets)
 
+
+def load_conjoint_synthetic(dims):
+    """
+    Load the conjoint synthetic dataset consisting of data samples with common (shared) component and private ones.
+
+    Args:
+        dims: tuple, flattened dimensionalities of each dataset
+
+    Returns:
+        A tuple (if multiple dims is tuple else a dict) of datasets with the aforementioned property.
+    """
+    if isinstance(dims, int):
+        dims = tuple([dims])
+
+    datasets = []
+    for dim in dims:
+        primary_dim = dim // 2
+        secondary_dim = dim - primary_dim
+        primary_components = np.repeat(np.eye(primary_dim), secondary_dim, axis=0)
+        secondary_components = np.tile(np.eye(secondary_dim), (primary_dim, 1))
+        data = np.concatenate((primary_components, secondary_components), axis=1)
+        primary_labels = np.repeat(np.arange(primary_dim), primary_dim, axis=0)
+        secondary_labels = np.tile(np.arange(secondary_dim), secondary_dim)
+        datasets.append({'data': data, 'target': primary_labels, 'tag': secondary_labels})
+
+    if len(datasets) == 1:
+        # unlist the result
+        return datasets[0]
     return tuple(datasets)

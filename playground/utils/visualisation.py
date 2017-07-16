@@ -115,7 +115,7 @@ def plot_sampled_data(data, fig_dirpath=None, fig_name=None):
         plt.show()
 
 
-def plot_reconstructed_data(data, reconstructed_data, fig_dirpath=None, fig_name=None):
+def plot_reconstructed_data(data, reconstructed_data, fig_dirpath=None, fig_name=None, pad_to_size=None):
     """
     Plot pairwise data and reconstructed data images in a large plot.
 
@@ -124,6 +124,8 @@ def plot_reconstructed_data(data, reconstructed_data, fig_dirpath=None, fig_name
         reconstructed_data: ndarray, reconstructed data samples of the same shape as data
         fig_dirpath: str, optional path to folder where the figure will be saved and not showed
         fig_name: str, optional name of the plot figure
+        pad_to_size: int, optional number of padding zeros in case the data dimensionality doesn't reshape to square
+            and a customised size is wanted (otherwise the padding will be to the next largest square)
 
     Returns:
 
@@ -132,16 +134,20 @@ def plot_reconstructed_data(data, reconstructed_data, fig_dirpath=None, fig_name
     fig_name = fig_name or 'reconstructed_samples.png'
     if not fig_name.endswith('.png'):
         fig_name += '.png'
-    if fig_dirpath.endswith('synthetic'):
-        #reshaping synthetic dataset to enable plotting
-        idx = np.repeat(8, 8)
-        data = np.insert(data, idx, 0, axis=1)
-        reconstructed_data = np.insert(reconstructed_data, idx, 0, axis=1)
-    data_dim = data.shape[1]
+
+    data_size, data_dim = data.shape
     sample_side_size = int(np.sqrt(data_dim))
+
+    # pad data with 0s if data sample size is not a square number
+    if sample_side_size ** 2 < data_dim:
+        next_larges_square_num = int(np.ceil(np.sqrt(data_dim))) ** 2
+        total_size = pad_to_size or next_larges_square_num
+        data = np.concatenate([data, np.zeros((data_size, total_size - data_dim))], axis=-1)
+        reconstructed_data = np.concatenate([reconstructed_data, np.zeros((data_size, total_size - data_dim))], axis=-1)
+        sample_side_size = int(np.sqrt(total_size))
+
     reconstructed_data = reconstructed_data.reshape(-1, sample_side_size, sample_side_size)
     data = data.reshape(-1, sample_side_size, sample_side_size)
-    data_size = data.shape[0]
     combined_data_reconstructions = np.concatenate([data, reconstructed_data], axis=-1)
     # add a separating blank line between the reshaped column of image pairs for better visualisation
     combined_data_reconstructions = np.concatenate([combined_data_reconstructions,
