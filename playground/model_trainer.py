@@ -2,10 +2,11 @@ from __future__ import absolute_import
 
 import logging
 import shutil
-from datetime import datetime
-
 import os
+import matplotlib.pyplot as plt
+
 from numpy import argmin, savez, asscalar
+from datetime import datetime
 
 from playground.models import *
 from playground.utils.config import load_config
@@ -46,6 +47,21 @@ class ModelTrainer(object):
             The model instance. 
         """
         return self.model
+
+    def _plot_loss(self, loss_history):
+        """
+        Plot the graph of the loss during training.
+
+        Args:
+            loss_history: dict, loss history object for each of the (sub)models.
+
+        Returns:
+            In-place method.
+        """
+        for fname, loss in loss_history.items():
+            plt.plot(loss)
+            plt.savefig(os.path.join(self.experiment_dir, fname + '.png'))
+            plt.gcf().clear()
 
     @staticmethod
     def prepare_training():
@@ -90,6 +106,7 @@ class ModelTrainer(object):
                                                                                  datetime.now().isoformat()))
             if loss_history is not None:
                 savez(os.path.join(self.experiment_dir, 'loss.npz'), **loss_history)
+                self._plot_loss(loss_history)
         except IOError:
             logger.error("Saving train history and other meta-information failed.")
 
@@ -111,8 +128,6 @@ class ModelTrainer(object):
         try:
             loss_history = self.fit_model(data, batch_size, epochs)
             endmodel_dir = os.path.join(self.experiment_dir, 'final')
-            plt.plot(loss_history['conjoint_vae_loss'])
-            plt.savefig('losshistory.png')
             self.model.save(endmodel_dir)
         except KeyboardInterrupt:
             if save_interrupted:

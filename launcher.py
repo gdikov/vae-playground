@@ -1,12 +1,11 @@
 from numpy import save as save_array
 from os.path import join as path_join
-from numpy import repeat, asarray
+from numpy import repeat
 from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
-from playground.utils.datasets import load_npoints, load_mnist
+from playground.utils.datasets import load_conjoint_synthetic, load_mnist
 from playground.utils.logger import logger
 from keras.backend import clear_session
-
 
 # import tensorflow as tf
 # from keras.backend.tensorflow_backend import set_session
@@ -15,31 +14,34 @@ from keras.backend import clear_session
 # set_session(tf.Session(config=config))
 
 
-def run_synthetic_experiment(model='vae', pretrained_model=None):
+def run_synthetic_experiment(model='avb', pretrained_model=None):
     logger.info("Starting a conjoint model experiment on the synthetic dataset.")
     data_dims = (8, 8)
     latent_dims = (2, 2, 2)
-    data = load_npoints(n=(4, 4), noisy=False, n_variations=2)
-    if model=='vae':
+    data = load_conjoint_synthetic(dims=data_dims)
+
+    if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
                                           experiment_name='synthetic', architecture='synthetic',
                                           overwrite=True, optimiser_params={'lr': 0.001},
                                           pretrained_dir=pretrained_model)
-    elif model=='avb':
-        trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=16,
-                                        experiment_name='synthetic', architecture='synthetic',
-                                        overwrite=True, use_adaptive_contrast=False,
-                                        optimiser_params=None,
-                                        pretrained_dir=pretrained_model)
+    elif model == 'avb':
+        trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=4,
+                                          use_adaptive_contrast=False,
+                                          optimiser_params=None,
+                                          overwrite=True,
+                                          pretrained_dir=pretrained_model,
+                                          architecture='synthetic',
+                                          experiment_name='synthetic')
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(data, batch_size=100, epochs=1000)
+    model_dir = trainer.run_training(data, batch_size=16, epochs=1000)
     trained_model = trainer.get_model()
 
-    sampling_size = 100
+    sampling_size = 1000
 
-    latent_vars = trained_model.infer(data, batch_size=10, sampling_size=sampling_size)
+    latent_vars = trained_model.infer(data, batch_size=4, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
     plot_latent_2d(latent_vars[:, -2:], repeat(data[0]['target'], sampling_size),
                    fig_dirpath=model_dir, fig_name='shared.png')
@@ -47,14 +49,16 @@ def run_synthetic_experiment(model='vae', pretrained_model=None):
     for i, lat_id in enumerate(latent_dims[:-1]):
         start_id = stop_id
         stop_id += lat_id
-        plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(data[0]['privatelatent'], sampling_size),
+        plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(data[0]['tag'], sampling_size),
                        fig_dirpath=model_dir, fig_name='private_{}'.format(i))
 
     reconstructions = trained_model.reconstruct(data, batch_size=16, sampling_size=1)
     save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
     for i, rec in enumerate(reconstructions):
         plot_reconstructed_data(data[i]['data'], rec,
-                                fig_dirpath=model_dir, fig_name='reconstructed_{}'.format(i))
+                                fig_dirpath=model_dir,
+                                fig_name='reconstructed_{}'.format(i),
+                                pad_to_size=16)
 
     generations = trained_model.generate(n_samples=100, batch_size=100)
     save_array(path_join(model_dir, 'generated_samples.npy'), generations)
@@ -89,6 +93,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=16,
                                           use_adaptive_contrast=False,
                                           optimiser_params=None,
+                                          overwrite=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='mnist',
                                           experiment_name='mnist_variations')
@@ -128,7 +133,5 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
 
 
 if __name__ == '__main__':
-    run_synthetic_experiment(model='avb')
-    #run_mnist_experiment()#pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')
-    #run_mnist_experiment(model='vae', pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')
-
+    run_synthetic_experiment(model='vae')
+    # run_mnist_experiment(model='vae', pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')
