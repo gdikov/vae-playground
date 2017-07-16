@@ -1,5 +1,3 @@
-#import sys
-#sys.path.append('C:\\Users\\Elli Wittmann\\Anaconda3\\envs\\tensorflow\\Lib\\site-packages\\tensorflow\\python')
 from numpy import save as save_array
 from os.path import join as path_join
 from numpy import repeat, asarray
