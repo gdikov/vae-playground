@@ -26,9 +26,10 @@ def run_synthetic_experiment(model='avb', pretrained_model=None):
                                           overwrite=True, optimiser_params={'lr': 0.001},
                                           pretrained_dir=pretrained_model)
     elif model == 'avb':
-        trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=4,
+        trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=data_dims[0],
                                           use_adaptive_contrast=False,
-                                          optimiser_params=None,
+                                          optimiser_params={'encdec': {'lr': 1e-3, 'beta_1': 0.5},
+                                                            'disc': {'lr': 1e-3, 'beta_1': 0.5}},
                                           overwrite=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='synthetic',
@@ -36,7 +37,8 @@ def run_synthetic_experiment(model='avb', pretrained_model=None):
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(data, batch_size=16, epochs=1000)
+    model_dir = trainer.run_training(data, batch_size=16, epochs=1000, save_interrupted=True)
+    # model_dir = './output/tmp'
     trained_model = trainer.get_model()
 
     sampling_size = 1000
@@ -92,7 +94,8 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=16,
                                           use_adaptive_contrast=False,
-                                          optimiser_params=None,
+                                          optimiser_params={'encdec': {'lr': 1e-4, 'beta_1': 0.5},
+                                                            'disc': {'lr': 2e-4, 'beta_1': 0.5}},
                                           overwrite=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='mnist',
@@ -108,7 +111,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
 
     latent_vars = trained_model.infer(train_data, batch_size=100, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
-    plot_latent_2d(latent_vars[:, -2:], repeat(train_data[0]['target'], sampling_size),
+    plot_latent_2d(latent_vars[:, -2:], repeat(train_data[0]['tag'], sampling_size),
                    fig_dirpath=model_dir, fig_name='shared.png')
     stop_id = 0
     for i, lat_id in enumerate(latent_dims[:-1]):
@@ -133,5 +136,5 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
 
 
 if __name__ == '__main__':
-    run_synthetic_experiment(model='vae')
+    run_synthetic_experiment(model='avb')#, pretrained_model='./output/conjoint_avb/synthetic/final')
     # run_mnist_experiment(model='vae', pretrained_model='./output/conjoint_gaussian_vae/mnist_variations/final')

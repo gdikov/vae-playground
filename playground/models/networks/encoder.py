@@ -127,7 +127,10 @@ class StandardConjointEncoder(object):
         latent_space, features = [], []
         inputs = [Input(shape=(dim,), name="enc_data_input_{}".format(i)) for i, dim in enumerate(data_dims)]
         standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler')
-        standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'add'}
+        if network_architecture == 'synthetic':
+            standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'concatenate'}
+        else:
+            standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'add'}
         for i, inp in enumerate(inputs):
             noise_input = standard_normal_sampler(inp)
             feature = get_network_by_name['conjoint_encoder'][network_architecture](noise_input,
