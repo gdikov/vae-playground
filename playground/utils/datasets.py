@@ -316,6 +316,9 @@ def load_mnist(local_data_path=None, one_hot=True, binarised=True, rotated=False
             custom_dataset['target'] = convert_to_one_hot(custom_dataset['target'])
         custom_dataset = {k: custom_dataset[k] for k in custom_dataset.keys()}
         custom_dataset['data'] = custom_dataset['data'].reshape((-1, 784))
+        tag2id = {t: i for i, t in enumerate(set(custom_dataset['tag']))}
+        tags = [tag2id[tag] for tag in custom_dataset['tag']]
+        custom_dataset['tag'] = tags
         return custom_dataset
 
     train_filename = None
