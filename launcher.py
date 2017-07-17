@@ -87,6 +87,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
         data_1 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_vertical.npz',
                             one_hot=False, binarised=False, background='custom')
     elif two_backgrounds_per_encoder:
+        # data sets are generated if not found
         experiment_name = 'mnist_variation_two_backgrounds_per_encoder'
         if small_set:
             setsize = 1000
@@ -131,10 +132,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    if not pretrained_model:
-        model_dir = trainer.run_training(train_data, batch_size=100, epochs=10, save_interrupted=True)
-    else:
-        model_dir = 'output\\conjoint_gaussian_vae\\mnist_variation_two_backgrounds_per_encoder'
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000, save_interrupted=True)
     trained_model = trainer.get_model()
 
     sampling_size = 1
@@ -179,5 +177,6 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
 
 
 if __name__ == '__main__':
-    run_mnist_experiment(model='vae', two_backgrounds_per_encoder=True, small_set=True, color_tags=True)
-
+    # Two backgrounds per encoder (strippy horizontal/vertical and trippy/mandelbrot)
+    # Datasets (N=50k) are created at 'data/MNIST_Custom_Variations' if they don't exist (may take a while)
+    run_mnist_experiment(model='vae', two_backgrounds_per_encoder=True, color_tags=True)
