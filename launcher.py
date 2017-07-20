@@ -143,7 +143,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
         # Create pairs of image IDs (randomly or not)
         random = True
         if random:
-            test_img_ids = asarray([randint(50000, size=2) for _ in range(8)])
+            test_img_ids = asarray([randint(49999, size=2) for _ in range(8)])
         else:
             test_img_ids = ([[49689, 10742],
                              [38467, 919],
