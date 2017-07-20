@@ -109,7 +109,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
             new_data = cmnist.generate(setsize, [0.5, 0, 0.5, 0])
             save_as = 'trippy_and_mandelbrot'
             if small_set: save_as += '_small'
-            cmnist.save_dataset(new_data, 'trippy_and_mandelbrot_small')
+            cmnist.save_dataset(new_data, 'trippy_and_mandelbrot')
         data_1 = load_mnist(local_path_1, one_hot=False, binarised=False, background='custom')
 
     train_data = ({'data': data_0['data'][:-test_size], 'target': data_0['target'][:-test_size]},
@@ -132,7 +132,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000, save_interrupted=True)
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=30, save_interrupted=True)
     trained_model = trainer.get_model()
 
     sampling_size = 1
