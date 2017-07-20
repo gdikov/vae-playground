@@ -1,13 +1,14 @@
 from numpy import save as save_array
 from os.path import join as path_join, isfile
-from numpy import repeat, asarray, unique, zeros_like
+from numpy import repeat, asarray, unique, zeros_like, int8, concatenate, copy
+from numpy.random import randint
 from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
 from playground.utils.datasets import load_conjoint_synthetic, load_mnist
 from playground.utils.logger import logger
 from keras.backend import clear_session
 from playground.utils.data_factory import CustomMNIST
-import numpy as np
+from matplotlib import pyplot as plt
 
 
 # import tensorflow as tf
@@ -139,7 +140,68 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
     trained_model = trainer.get_model()
 
     if change_background:
-        pass
+        # Create pairs of image IDs (randomly or not)
+        random = True
+        if random:
+            test_img_ids = asarray([randint(50000, size=2) for _ in range(8)])
+        else:
+            test_img_ids = ([[49689, 10742],
+                             [38467, 919],
+                             [13927, 34140],
+                             [2583, 28232],
+                             [27354, 45960]])
+
+        for id_0, id_1 in test_img_ids:
+            # Create example data set with N=1 for each pair of images
+            example_data = (
+                {'data': asarray(data_0['data'][id_0]).reshape((1, 784)), 'target': asarray(data_0['target'][id_0])},
+                {'data': asarray(data_1['data'][id_1]).reshape((1, 784)), 'target': asarray(data_1['target'][id_1])})
+
+            # Infer latent variables for three cases: IMG0-IMG0, IMG1-IMG1, IMG0-IMG1
+            latent_img0_twice = trained_model.infer((example_data[0], example_data[0]), batch_size=1, sampling_size=1)
+            latent_img1_twice = trained_model.infer((example_data[1], example_data[1]), batch_size=1, sampling_size=1)
+            latent_mixed = trained_model.infer(example_data, batch_size=1, sampling_size=1)
+
+            # Copy latent variables and replace mixed shared latent space with pure shared latent space
+            # Pure latent space means both input images were identical
+            latent_num0_bg1 = copy(latent_mixed)
+            latent_num1_bg0 = copy(latent_mixed)
+            for i in (4, 5):
+                latent_num0_bg1[0][i] = latent_img0_twice[0][i]
+                latent_num1_bg0[0][i] = latent_img1_twice[0][i]
+
+            # Reconstruct from mixed and the two pure shared latent spaces
+            reconstruction_original = trained_model.generate(1, 1, latent_samples=latent_mixed)
+            reconstruction_num0_bg1 = trained_model.generate(1, 1, latent_samples=latent_num0_bg1)
+            reconstruction_num1_bg0 = trained_model.generate(1, 1, latent_samples=latent_num1_bg0)
+
+            # Create one Row of Visualizations (See description below)
+            img0 = example_data[0]['data'].reshape((28, 28))
+            reconst0 = reconstruction_original[0, 0].reshape((28, 28))
+            num0_bg0 = reconstruction_num0_bg1[0, 0].reshape((28, 28))
+            num0_bg1 = reconstruction_num0_bg1[1, 0].reshape((28, 28))
+
+            # Same thing for other image
+            img1 = example_data[1]['data'].reshape((28, 28))
+            reconst1 = reconstruction_original[1, 0].reshape((28, 28))
+            num1_bg1 = reconstruction_num1_bg0[1, 0].reshape((28, 28))
+            num1_bg0 = reconstruction_num1_bg0[0, 0].reshape((28, 28))
+            row = concatenate((img0, reconst0, num0_bg0, num0_bg1, img1, reconst1, num1_bg1, num1_bg0), axis=1)
+            try:
+                img = concatenate((img, row), axis=0)
+            except NameError:
+                img = row
+
+        plt.imshow(img, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
+        # Description of this plot:
+        # The left four images in a row correspond to a picture form dataset0, the right four from dataset1
+        # The pictures from left to right:
+        # original,
+        # reconstruction from mixed shared latent
+        # reconstruction from pure shared latent with own background,
+        # reconstruction from pure shared latent space with other background
+        plt.savefig('output/conjoint_gaussian_vae/reconstructed_changed_background.png')
+
     else:
         sampling_size = 1
 
@@ -156,7 +218,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
             stop_id += lat_id
             if color_tags:
                 tags = data[i]['tag'][:-test_size]
-                tags_num = zeros_like(train_data[0]['target'], dtype=np.int8)
+                tags_num = zeros_like(train_data[0]['target'], dtype=int8)
                 tag_dict = dict(enumerate(unique(tags)))
                 assert len(tags_num) == len(tags)
                 for k, v in tag_dict.items():
@@ -185,4 +247,4 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
 if __name__ == '__main__':
     pretrained_dir = "output/conjoint_gaussian_vae/vae_mnist_2ds_per_encoder_272epochs_fullsize"
     run_mnist_experiment(model='vae', two_backgrounds_per_encoder=True, color_tags=True,
-                         pretrained_model=pretrained_dir)
+                         pretrained_model=pretrained_dir, change_background=True)
