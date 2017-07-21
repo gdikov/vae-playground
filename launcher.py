@@ -110,7 +110,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
             new_data = cmnist.generate(setsize, [0.5, 0, 0.5, 0])
             save_as = 'trippy_and_mandelbrot'
             if small_set: save_as += '_small'
-            cmnist.save_dataset(new_data, 'trippy_and_mandelbrot')
+            cmnist.save_dataset(new_data, save_as)
         data_1 = load_mnist(local_path_1, one_hot=False, binarised=False, background='custom')
 
     train_data = ({'data': data_0['data'][:-test_size], 'target': data_0['target'][:-test_size]},
@@ -140,66 +140,58 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
     trained_model = trainer.get_model()
 
     if change_background:
-        # Create pairs of image IDs (randomly or not)
-        random = True
-        if random:
-            test_img_ids = asarray([randint(49999, size=2) for _ in range(8)])
-        else:
-            test_img_ids = ([[49689, 10742],
-                             [38467, 919],
-                             [13927, 34140],
-                             [2583, 28232],
-                             [27354, 45960]])
+        max_index = 999 if small_set else 49999
 
-        for id_0, id_1 in test_img_ids:
-            # Create example data set with N=1 for each pair of images
-            example_data = (
-                {'data': asarray(data_0['data'][id_0]).reshape((1, 784)), 'target': asarray(data_0['target'][id_0])},
-                {'data': asarray(data_1['data'][id_1]).reshape((1, 784)), 'target': asarray(data_1['target'][id_1])})
+        for _ in range(15):
+            # id_num is ID of image used for digit, id_bg of image used for background
+            id_num = randint(max_index)
 
-            # Infer latent variables for three cases: IMG0-IMG0, IMG1-IMG1, IMG0-IMG1
-            latent_img0_twice = trained_model.infer((example_data[0], example_data[0]), batch_size=1, sampling_size=1)
-            latent_img1_twice = trained_model.infer((example_data[1], example_data[1]), batch_size=1, sampling_size=1)
-            latent_mixed = trained_model.infer(example_data, batch_size=1, sampling_size=1)
+            # Data set with one digit in front of 2 different backgrounds
+            num_data = (
+                {'data': asarray(data_0['data'][id_num]).reshape((1, 784)),
+                 'target': asarray(data_0['target'][id_num])},
+                {'data': asarray(data_1['data'][id_num]).reshape((1, 784)),
+                 'target': asarray(data_1['target'][id_num])})
 
-            # Copy latent variables and replace mixed shared latent space with pure shared latent space
-            # Pure latent space means both input images were identical
-            latent_num0_bg1 = copy(latent_mixed)
-            latent_num1_bg0 = copy(latent_mixed)
+            while True:
+                id_bg_0 = randint(max_index)
+                if data_0['tag'][id_num] != data_0['tag'][id_bg_0]:
+                    break
+
+            while True:
+                id_bg_1 = randint(max_index)
+                if data_1['tag'][id_num] != data_1['tag'][id_bg_1]:
+                    break
+
+            # Different random digit for left and right encoder, each has different background from num_data set
+            bg_data = (
+                {'data': asarray(data_0['data'][id_bg_0]).reshape((1, 784)),
+                 'target': asarray(data_0['target'][id_bg_0])},
+                {'data': asarray(data_1['data'][id_bg_1]).reshape((1, 784)),
+                 'target': asarray(data_1['target'][id_bg_1])})
+
+            # Infer latent variables for num_data and bg_data set
+            latent_num = trained_model.infer(num_data, batch_size=1, sampling_size=1)
+            latent_bg = trained_model.infer(bg_data, batch_size=1, sampling_size=1)
+            latent_mixed = copy(latent_bg)
             for i in (4, 5):
-                latent_num0_bg1[0][i] = latent_img0_twice[0][i]
-                latent_num1_bg0[0][i] = latent_img1_twice[0][i]
+                latent_mixed[0][i] = latent_num[0][i]
 
             # Reconstruct from mixed and the two pure shared latent spaces
-            reconstruction_original = trained_model.generate(1, 1, latent_samples=latent_mixed)
-            reconstruction_num0_bg1 = trained_model.generate(1, 1, latent_samples=latent_num0_bg1)
-            reconstruction_num1_bg0 = trained_model.generate(1, 1, latent_samples=latent_num1_bg0)
+            reconstruction_original = trained_model.generate(1, 1, latent_samples=latent_num)
+            reconstruction_mixed = trained_model.generate(1, 1, latent_samples=latent_mixed)
 
-            # Create one Row of Visualizations (See description below)
-            img0 = example_data[0]['data'].reshape((28, 28))
-            reconst0 = reconstruction_original[0, 0].reshape((28, 28))
-            num0_bg0 = reconstruction_num0_bg1[0, 0].reshape((28, 28))
-            num0_bg1 = reconstruction_num0_bg1[1, 0].reshape((28, 28))
-
-            # Same thing for other image
-            img1 = example_data[1]['data'].reshape((28, 28))
-            reconst1 = reconstruction_original[1, 0].reshape((28, 28))
-            num1_bg1 = reconstruction_num1_bg0[1, 0].reshape((28, 28))
-            num1_bg0 = reconstruction_num1_bg0[0, 0].reshape((28, 28))
-            row = concatenate((img0, reconst0, num0_bg0, num0_bg1, img1, reconst1, num1_bg1, num1_bg0), axis=1)
+            num_0 = num_data[0]['data'].reshape((28, 28))
+            reconst_0 = reconstruction_original[0, 0].reshape((28, 28))
+            num_1 = num_data[1]['data'].reshape((28, 28))
+            reconst_1 = reconstruction_original[1, 0].reshape((28, 28))
+            row = concatenate((num_0, reconst_0, num_1, reconst_1), axis=1)
             try:
                 img = concatenate((img, row), axis=0)
             except NameError:
                 img = row
 
         plt.imshow(img, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
-        # Description of this plot:
-        # The left four images in a row correspond to a picture form dataset0, the right four from dataset1
-        # The pictures from left to right:
-        # original,
-        # reconstruction from mixed shared latent
-        # reconstruction from pure shared latent with own background,
-        # reconstruction from pure shared latent space with other background
         plt.savefig('output/conjoint_gaussian_vae/reconstructed_changed_background.png')
 
     else:
@@ -246,5 +238,5 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
 
 if __name__ == '__main__':
     pretrained_dir = "output/conjoint_gaussian_vae/vae_mnist_2ds_per_encoder_272epochs_fullsize"
-    run_mnist_experiment(model='vae', two_backgrounds_per_encoder=True, color_tags=True,
+    run_mnist_experiment(model='vae', two_backgrounds_per_encoder=True, color_tags=True, small_set=True,
                          pretrained_model=pretrained_dir, change_background=True)
