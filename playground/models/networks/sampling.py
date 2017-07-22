@@ -39,10 +39,8 @@ def sample_standard_normal_noise(inputs, **kwargs):
         added_noise_data = Add(name='enc_adding_noise_data')([inputs, resized_noise])
         return added_noise_data
     elif op_mode == 'product':
-        outputshape = noise_dim**2
-        bilinearProduct = Lambda(outer_product, output_shape=(noise_dim ** 2, ))([inputs, samples_isotropic])
-        # bilinearProduct = Reshape((outputshape),bilinearProduct)
-        return bilinearProduct
+        product_noise = Lambda(outer_product, output_shape=(noise_dim ** 2, ))([inputs, samples_isotropic])
+        return product_noise
     return samples_isotropic
 
 
