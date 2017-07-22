@@ -180,8 +180,9 @@ class AdversarialVariationalBayes(BaseVariationalAutoencoder):
                 score = elbo
                 tqdm.write("ELBO estimate: {}, Posterior abnormality: {}, "
                            "Reconstruction error: {}".format(elbo, kl_marginal, rec_err))
-                if checkpoint_callback is not None and current_best_score < score:
+                if checkpoint_callback is not None and score > current_best_score:
                     checkpoint_callback()
+                    current_best_score = score
                 history['elbo'].append(elbo)
 
         return history
@@ -332,8 +333,9 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
                 score = elbo
                 tqdm.write("ELBO estimate: {}, Posterior abnormality: {}, "
                            "Reconstruction error: {}".format(elbo, kl_marginal, rec_err))
-                if checkpoint_callback is not None and current_best_score < score:
+                if checkpoint_callback is not None and score > current_best_score:
                     checkpoint_callback()
+                    current_best_score = score
                 history['elbo'].append(elbo)
 
         return history

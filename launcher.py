@@ -81,8 +81,8 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
                         one_hot=False, binarised=False, background='custom')
     data_1 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_checker.npz',
                         one_hot=False, binarised=False, background='custom')
-    train_data = ({'data': data_0['data'][:-100][:100], 'target': data_0['target'][:-100][:100], 'tag': data_0['tag'][:-100][:100]},
-                  {'data': data_1['data'][:-100][:100], 'target': data_1['target'][:-100][:100], 'tag': data_1['tag'][:-100][:100]})
+    train_data = ({'data': data_0['data'][:-100], 'target': data_0['target'][:-100], 'tag': data_0['tag'][:-100]},
+                  {'data': data_1['data'][:-100], 'target': data_1['target'][:-100], 'tag': data_1['tag'][:-100]})
     test_data = ({'data': data_0['data'][-100:], 'target': data_0['target'][-100:], 'tag': data_0['tag'][-100:]},
                  {'data': data_1['data'][-100:], 'target': data_1['target'][-100:], 'tag': data_1['tag'][-100:]})
 
@@ -104,8 +104,11 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=10, save_interrupted=True,
-                                     validation_data=test_data, validation_frequency=5, validation_sampling_size=5)
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
+                                     save_interrupted=True,
+                                     validation_data=test_data,
+                                     validation_frequency=20,
+                                     validation_sampling_size=5)
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
 
