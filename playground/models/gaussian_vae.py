@@ -4,6 +4,7 @@ from builtins import range, next
 from keras.models import Model
 from keras.optimizers import RMSprop, Adam
 from tqdm import tqdm, trange
+from numpy import inf as float_inf
 
 from ..utils.config import load_config
 from .losses import VAELossLayer
@@ -65,17 +66,22 @@ class GaussianVariationalAutoencoder(BaseVariationalAutoencoder):
         Keyword Args:
             validation_data: ndarray, validation data to monitor the model performance
             validation_frequency: int, after how many epochs the model should be validated
+            validation_sampling_size: int, number of noisy computations for each validation sample
+            checkpoint_callback: function, python function to execute when performance is improved
 
         Returns:
             A training history dict.
         """
         val_data = kwargs.get('validation_data', None)
         val_freq = kwargs.get('validation_frequency', 10)
+        val_sampling_size = kwargs.get('validation_sampling_size', 10)
+        checkpoint_callback = kwargs.get('checkpoint_callback', None)
 
         data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
 
-        history = {'vae_loss': []}
-        for _ in trange(epochs):
+        history = {'vae_loss': [], 'elbo': []}
+        current_best_score = -float_inf
+        for ep in trange(epochs):
             epoch_loss_history_vae = []
             for it in range(batches_per_epoch):
                 data_batch = next(data_iterator)
@@ -83,6 +89,17 @@ class GaussianVariationalAutoencoder(BaseVariationalAutoencoder):
                 epoch_loss_history_vae.append(loss_autoencoder)
             history['vae_loss'].append(epoch_loss_history_vae)
 
+            if val_data is not None and (ep + 1) % val_freq == 0:
+                elbo, kl_marginal, rec_err = self.evaluate(val_data, batch_size=batch_size,
+                                                           sampling_size=val_sampling_size,
+                                                           verbose=False)
+                # possibly think of some combination of all three metrics for the score calculation
+                score = elbo
+                tqdm.write("ELBO estimate: {}, Posterior abnormality: {}, "
+                           "Reconstruction error: {}".format(elbo, kl_marginal, rec_err))
+                if checkpoint_callback is not None and current_best_score < score:
+                    checkpoint_callback()
+                history['elbo'].append(elbo)
         return history
 
 
@@ -137,6 +154,7 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
             validation_data: ndarray, validation data to monitor the model performance
             validation_frequency: int, after how many epochs the model should be validated
             validation_sampling_size: int, number of noisy computations for each validation sample
+            checkpoint_callback: function, python function to execute when performance is improved
 
         Returns:
             A training history dict.
@@ -144,10 +162,12 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
         val_data = kwargs.get('validation_data', None)
         val_freq = kwargs.get('validation_frequency', 10)
         val_sampling_size = kwargs.get('validation_sampling_size', 10)
+        checkpoint_callback = kwargs.get('checkpoint_callback', None)
 
         data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training')
 
-        history = {'conjoint_vae_loss': []}
+        history = {'conjoint_vae_loss': [], 'elbo': []}
+        current_best_score = -float_inf
         for ep in trange(epochs):
             epoch_loss_history_vae = []
             for it in range(batches_per_epoch):
@@ -155,11 +175,16 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
                 loss_autoencoder = self.conjoint_vae_model.train_on_batch(data_batch, None)
                 epoch_loss_history_vae.append(loss_autoencoder)
             history['conjoint_vae_loss'].append(epoch_loss_history_vae)
+
             if val_data is not None and (ep + 1) % val_freq == 0:
                 elbo, kl_marginal, rec_err = self.evaluate(val_data, batch_size=batch_size,
                                                            sampling_size=val_sampling_size,
                                                            verbose=False)
-                tqdm.write("ELBO estimate: {}, Posterior normality: {}, "
+                # possibly think of some combination of all three metrics for the score calculation
+                score = elbo
+                tqdm.write("ELBO estimate: {}, Posterior abnormality: {}, "
                            "Reconstruction error: {}".format(elbo, kl_marginal, rec_err))
-
+                if checkpoint_callback is not None and current_best_score < score:
+                    checkpoint_callback()
+                history['elbo'].append(elbo)
         return history

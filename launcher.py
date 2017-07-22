@@ -81,29 +81,31 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
                         one_hot=False, binarised=False, background='custom')
     data_1 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_checker.npz',
                         one_hot=False, binarised=False, background='custom')
-    train_data = ({'data': data_0['data'][:-100], 'target': data_0['target'][:-100], 'tag': data_0['tag'][:-100]},
-                  {'data': data_1['data'][:-100], 'target': data_1['target'][:-100], 'tag': data_1['tag'][:-100]})
+    train_data = ({'data': data_0['data'][:-100][:100], 'target': data_0['target'][:-100][:100], 'tag': data_0['tag'][:-100][:100]},
+                  {'data': data_1['data'][:-100][:100], 'target': data_1['target'][:-100][:100], 'tag': data_1['tag'][:-100][:100]})
     test_data = ({'data': data_0['data'][-100:], 'target': data_0['target'][-100:], 'tag': data_0['tag'][-100:]},
                  {'data': data_1['data'][-100:], 'target': data_1['target'][-100:], 'tag': data_1['tag'][-100:]})
 
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
                                           experiment_name='mnist_variations', architecture='mnist',
-                                          overwrite=True, optimiser_params={'lr': 0.0007, 'beta_1': 0.5},
+                                          overwrite=True, save_best=True,
+                                          optimiser_params={'lr': 0.0007, 'beta_1': 0.5},
                                           pretrained_dir=pretrained_model)
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=64,
                                           use_adaptive_contrast=False,
                                           optimiser_params={'encdec': {'lr': 1e-4, 'beta_1': 0.5},
                                                             'disc': {'lr': 2e-4, 'beta_1': 0.5}},
-                                          overwrite=True,
+                                          overwrite=True, save_best=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='mnist',
                                           experiment_name='mnist_variations')
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000, save_interrupted=True)
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=10, save_interrupted=True,
+                                     validation_data=test_data, validation_frequency=5, validation_sampling_size=5)
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
 
