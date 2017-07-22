@@ -133,17 +133,17 @@ class StandardConjointEncoder(object):
             standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'add'}
         elif noise_mode == 'concat':
             if network_architecture == 'mnist':
-                assert ((noise_dim % sqrt(data_dims[0]) == 0) & (noise_dim % sqrt(data_dims[1]) == 0)), \
+                assert ((noise_dim % sqrt(data_dims[0]) == 0) and (noise_dim % sqrt(data_dims[1]) == 0)), \
                 'Expected to receive a noise_dim that can form a rectangle with the given inputs_dims. Received {} as noise' \
                 'and {} and {} for the data dimension.'.format(noise_dim, data_dims[0], data_dims[1])
             standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'concatenate'}
         elif noise_mode == 'product':
-            assert data_dims[0] == noise_dim & data_dims[1] == noise_dim, \
+            assert data_dims[0] == noise_dim and data_dims[1] == noise_dim, \
             'Expected to receive a noise_dim that is equal to the given inputs_dims. Received {} as noise' \
             'and {} and {} for the data dimension.'.format(noise_dim, data_dims[0], data_dims[1])
             standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'product'}
         else:
-            raise NotImplementedError("Only the noise modes 'add', 'concat' and 'product' are available.")
+            raise ValueError("Only the noise modes 'add', 'concat' and 'product' are available.")
 
         for i, inp in enumerate(inputs):
             noise_input = standard_normal_sampler(inp)
