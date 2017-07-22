@@ -38,7 +38,7 @@ def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='con
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(data, batch_size=16, epochs=100, save_interrupted=True)
+    model_dir = trainer.run_training(data, batch_size=16, epochs=1000, save_interrupted=True)
     # model_dir = './output/tmp'
     trained_model = trainer.get_model()
 

@@ -1,19 +1,6 @@
-from keras.layers import Dense, Concatenate, Add, Lambda, Reshape
-from keras import backend as K
-from numpy import newaxis
+from keras.layers import Dense, Concatenate, Add, Lambda
 
-
-def outer_product(inputs):
-    """
-    inputs: list of two tensors (of equal dimensions,
-        for which you need to compute the outer product
-    """
-    x, y = inputs
-    feature_size = K.shape(x)[1] ** 2
-    outer_Product = x[:, :, newaxis] * y[:, newaxis, :]
-    outer_Product = K.reshape(outer_Product, (-1, feature_size))
-    # returns a flattened batch-wise set of tensors
-    return outer_Product
+from .generic_layer_utils import compute_outer_product
 
 
 def sample_standard_normal_noise(inputs, **kwargs):
@@ -39,7 +26,8 @@ def sample_standard_normal_noise(inputs, **kwargs):
         added_noise_data = Add(name='enc_adding_noise_data')([inputs, resized_noise])
         return added_noise_data
     elif op_mode == 'product':
-        product_noise = Lambda(outer_product, output_shape=(noise_dim ** 2, ))([inputs, samples_isotropic])
+        product_noise = Lambda(compute_outer_product, output_shape=(noise_dim ** 2,),
+                               name='enc_outer_prod_noise_data')([inputs, samples_isotropic])
         return product_noise
     return samples_isotropic
 

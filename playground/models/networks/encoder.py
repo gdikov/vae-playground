@@ -129,31 +129,29 @@ class StandardConjointEncoder(object):
         latent_space, features = [], []
         inputs = [Input(shape=(dim,), name="enc_data_input_{}".format(i)) for i, dim in enumerate(data_dims)]
         standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler')
-        if noise_mode == 'add':
-            standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'add'}
-        elif noise_mode == 'concat':
+
+        if noise_mode == 'concatenate':
             if network_architecture == 'mnist':
                 assert ((noise_dim % sqrt(data_dims[0]) == 0) and (noise_dim % sqrt(data_dims[1]) == 0)), \
-                'Expected to receive a noise_dim that can form a rectangle with the given inputs_dims. Received {} as noise' \
-                'and {} and {} for the data dimension.'.format(noise_dim, data_dims[0], data_dims[1])
-            standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'concatenate'}
+                    "Expected to receive a noise_dim that, when concatenated, can form a rectangle with " \
+                    "the given inputs_dims. Received {} noise and {} data dimensions.".format(noise_dim, data_dims)
         elif noise_mode == 'product':
             assert data_dims[0] == noise_dim and data_dims[1] == noise_dim, \
-            'Expected to receive a noise_dim that is equal to the given inputs_dims. Received {} as noise' \
-            'and {} and {} for the data dimension.'.format(noise_dim, data_dims[0], data_dims[1])
-            standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'product'}
+                "Expected to receive a noise_dim that is equal to the given inputs dimensions. " \
+                "Received {} noise and {} data dimensions.".format(noise_dim, data_dims)
         else:
             raise ValueError("Only the noise modes 'add', 'concat' and 'product' are available.")
+        standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': noise_mode}
 
         for i, inp in enumerate(inputs):
             noise_input = standard_normal_sampler(inp)
             feature = get_network_by_name['conjoint_encoder'][network_architecture](noise_input,
                                                                                     'enc_feat_{}'.format(i))
-            latent_factors = Dense(latent_dims[i], activation=None, name='enc_laten_priv_{}'.format(i))(feature)
+            latent_factors = Dense(latent_dims[i], activation=None, name='enc_latent_private_{}'.format(i))(feature)
             latent_space.append(latent_factors)
             features.append(feature)
 
-        merged_features = Concatenate(axis=-1, name='enc_conc_features')(features)
+        merged_features = Concatenate(axis=-1, name='enc_concat_features')(features)
         shared_latent = Dense(latent_dims[-1], activation=None, name='enc_shared_latent')(merged_features)
         latent_space = Concatenate(axis=-1, name='enc_concat_all_features')(latent_space + [shared_latent])
         self.encoder_model = Model(inputs=inputs, outputs=latent_space, name='encoder')
