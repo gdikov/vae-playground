@@ -3,7 +3,7 @@ from builtins import range, next
 
 from keras.models import Model
 from keras.optimizers import RMSprop, Adam
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 from ..utils.config import load_config
 from .losses import VAELossLayer
@@ -61,15 +61,21 @@ class GaussianVariationalAutoencoder(BaseVariationalAutoencoder):
             data: ndarray, training data
             batch_size: int, number of samples to be fit at one pass
             epochs: int, number of whole-size iterations on the training data
-            **kwargs: 
+
+        Keyword Args:
+            validation_data: ndarray, validation data to monitor the model performance
+            validation_frequency: int, after how many epochs the model should be validated
 
         Returns:
             A training history dict.
         """
+        val_data = kwargs.get('validation_data', None)
+        val_freq = kwargs.get('validation_frequency', 10)
+
         data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
 
         history = {'vae_loss': []}
-        for _ in tqdm(range(epochs)):
+        for _ in trange(epochs):
             epoch_loss_history_vae = []
             for it in range(batches_per_epoch):
                 data_batch = next(data_iterator)
@@ -126,20 +132,34 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
             data: ndarray, training data
             batch_size: int, number of samples to be fit at one pass
             epochs: int, number of whole-size iterations on the training data
-            **kwargs:
+
+        Keyword Args:
+            validation_data: ndarray, validation data to monitor the model performance
+            validation_frequency: int, after how many epochs the model should be validated
+            validation_sampling_size: int, number of noisy computations for each validation sample
 
         Returns:
             A training history dict.
         """
+        val_data = kwargs.get('validation_data', None)
+        val_freq = kwargs.get('validation_frequency', 10)
+        val_sampling_size = kwargs.get('validation_sampling_size', 10)
+
         data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training')
 
         history = {'conjoint_vae_loss': []}
-        for _ in tqdm(range(epochs)):
+        for ep in trange(epochs):
             epoch_loss_history_vae = []
             for it in range(batches_per_epoch):
                 data_batch = next(data_iterator)
                 loss_autoencoder = self.conjoint_vae_model.train_on_batch(data_batch, None)
                 epoch_loss_history_vae.append(loss_autoencoder)
             history['conjoint_vae_loss'].append(epoch_loss_history_vae)
+            if val_data is not None and (ep + 1) % val_freq == 0:
+                elbo, kl_marginal, rec_err = self.evaluate(val_data, batch_size=batch_size,
+                                                           sampling_size=val_sampling_size,
+                                                           verbose=False)
+                tqdm.write("ELBO estimate: {}, Posterior normality: {}, "
+                           "Reconstruction error: {}".format(elbo, kl_marginal, rec_err))
 
         return history
