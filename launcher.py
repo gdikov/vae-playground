@@ -90,21 +90,26 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
                                           experiment_name='mnist_variations', architecture='mnist',
-                                          overwrite=True, optimiser_params={'lr': 0.0007, 'beta_1': 0.5},
+                                          overwrite=True, save_best=True,
+                                          optimiser_params={'lr': 0.0007, 'beta_1': 0.5},
                                           pretrained_dir=pretrained_model)
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=64,
                                           use_adaptive_contrast=False,
                                           optimiser_params={'encdec': {'lr': 1e-4, 'beta_1': 0.5},
                                                             'disc': {'lr': 2e-4, 'beta_1': 0.5}},
-                                          overwrite=True,
+                                          overwrite=True, save_best=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='mnist',
                                           experiment_name='mnist_variations')
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000, save_interrupted=True)
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
+                                     save_interrupted=True,
+                                     validation_data=test_data,
+                                     validation_frequency=20,
+                                     validation_sampling_size=5)
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
 

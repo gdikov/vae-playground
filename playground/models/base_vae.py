@@ -3,13 +3,16 @@ from six import iteritems
 
 import numpy as np
 import os
+import logging
 
-from keras.models import Model, Input, load_model
+from keras.models import Model, Input
 from scipy.stats import norm as standard_gaussian
 
+from ..metrics import evidence_lower_bound, normality_of_marginal_posterior, reconstruction_error, data_log_likelihood
 from ..utils.config import load_config
 
 config = load_config('global_config.yaml')
+logger = logging.getLogger(__name__)
 np.random.seed(config['seed'])
 
 
@@ -149,14 +152,61 @@ class BaseVariationalAutoencoder(object):
 
         Keyword Args:
             sampling_size: int, the number of noisy samples which will be reconstructed for a single data input sample
+            return_latent: bool, whether to return the computed latent samples (e.g. if they should be reused later)
 
         Returns:
             A ndarray of the same shape as the input, representing the reconstructed samples
         """
         sampling_size = kwargs.get('sampling_size', 1)
+        return_latent = kwargs.get('return_latent', False)
         latent_samples = self.infer(data, batch_size, sampling_size=sampling_size)
         reconstructed_samples = self.generate(batch_size=batch_size, latent_samples=latent_samples, return_probs=True)
+        if return_latent:
+            return reconstructed_samples, latent_samples
         return reconstructed_samples
+
+    def evaluate(self, data, batch_size=32, **kwargs):
+        """
+        Evaluate model performance by estimating the ELBO, the KL divergence between the marginal posterior and a prior
+        and the reconstruction error.
+
+        Args:
+            data: ndarray, validation/test data
+            batch_size: int, number of samples to be processed at one pass
+
+        Keyword Args:
+            sampling_size: int, the number of noisy samples for each data sample
+
+        Returns:
+            The calculated ELBO, KL(q(z)||p(z)) and reconstruction loss
+        """
+        sampling_size = kwargs.get('sampling_size', 10)
+        if sampling_size < 5:
+            logger.warning("Cannot perform estimation of ELBO with so small sampling "
+                           "size ({}). Setting it to the minimum (5).".format(sampling_size))
+            sampling_size = 5
+        verbose = kwargs.get('verbose', True)
+
+        reconstructed_samples, latent_samples = self.reconstruct(data, batch_size,
+                                                                 sampling_size=sampling_size,
+                                                                 return_latent=True)
+        if isinstance(data, tuple):
+            concat_data = np.concatenate([d['data'] for d in data], axis=1)
+            reconstructed_samples = np.concatenate(reconstructed_samples, axis=1)
+            # Note that there is no need to concatenate the latent samples as they already are.
+        else:
+            concat_data = data['data']
+        elbo = evidence_lower_bound(true_samples=concat_data,
+                                    reconstructed_samples=reconstructed_samples,
+                                    latent_samples=latent_samples)
+        kl_marginal_prior = normality_of_marginal_posterior(latent_samples)
+        reconstrction_loss = reconstruction_error(true_samples=concat_data,
+                                                  reconstructed_samples_probs=reconstructed_samples)
+        if verbose:
+            logger.info("Estimated ELBO = {}".format(elbo))
+            logger.info("KL(q(z) || p(z)) = {}".format(kl_marginal_prior))
+            logger.info("Reconstruction error = {}".format(reconstrction_loss))
+        return elbo, kl_marginal_prior, reconstrction_loss
 
     def save(self, dirname):
         """

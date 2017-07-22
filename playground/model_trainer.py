@@ -5,7 +5,7 @@ import shutil
 import os
 import matplotlib.pyplot as plt
 
-from numpy import argmin, savez, asscalar
+from numpy import savez
 from datetime import datetime
 
 from playground.models import *
@@ -19,12 +19,13 @@ class ModelTrainer(object):
     """
     ModelTrainer is a wrapper around the AVBModel and VAEModel to train it, log and store the resulting models.
     """
-    def __init__(self, model, experiment_name, overwrite=True, checkpoint_best=False):
+    def __init__(self, model, experiment_name, overwrite=True, save_best=False):
         """
         Args:
             model: the model object to be trained  
             experiment_name: str, the name of the experiment/training used for logging purposes
-            overwrite: bool, whether the trained model should overwrite existing one with the same experiment_name 
+            overwrite: bool, whether the trained model should overwrite existing one with the same experiment_name
+            save_best: bool, whether to save the model performing best on validation data
         """
         self.model = model
         self.overwrite = overwrite
@@ -37,7 +38,7 @@ class ModelTrainer(object):
                                                self.experiment_name + '_{}'.format(datetime.now().isoformat()))
         if not os.path.exists(self.experiment_dir):
             os.makedirs(self.experiment_dir)
-        self.checkpoint_best = checkpoint_best
+        self.save_best = save_best
 
     def get_model(self):
         """
@@ -63,6 +64,19 @@ class ModelTrainer(object):
             plt.savefig(os.path.join(self.experiment_dir, fname + '.png'))
             plt.gcf().clear()
 
+    def cb_checkpoint_best_model(self):
+        """
+        Callback to save the best-so-far model in a dedicated folder.
+
+        Returns:
+            In-place method.
+        """
+        best_model_dir = os.path.join(self.experiment_dir, 'best')
+        if not os.path.exists(best_model_dir):
+            os.makedirs(best_model_dir)
+        logger.debug("Checkpointing model at {}".format(best_model_dir))
+        self.model.save(best_model_dir)
+
     @staticmethod
     def prepare_training():
         """
@@ -77,40 +91,35 @@ class ModelTrainer(object):
         training_starttime = datetime.now().isoformat()
         return training_starttime
 
-    def finalise_training(self, training_starttime, loss_history=None):
+    def finalise_training(self, training_starttime, loss_history=None, meta_info=None):
         """
         Clean up and store best model after training.
         
         Args:
             training_starttime: str, the formatted starting timestamp
             loss_history: dict, of the loss history for each model loss layer
+            meta_info: dict, additional training related information such as pre-trained model initialisation (if used),
+                optimiser parameters, etc.
             
         Returns:
             In-place method.
         """
         try:
-            checkpoints = [fname for fname in os.listdir(config['temp_dir']) if 'interrupted' not in fname]
-            if self.checkpoint_best:
-                best_checkpoint = checkpoints[asscalar(argmin([float(fname.split('_')[3]) for fname in checkpoints]))]
-                tmp_model_dirname = os.path.join(config['temp_dir'], best_checkpoint)
-                for f in os.listdir(tmp_model_dirname):
-                    if f.endswith('.h5'):
-                        shutil.move(os.path.join(tmp_model_dirname, f), os.path.join(self.experiment_dir, f))
-        except IOError:
-            logger.error("Saving model in model directory failed miserably.")
-        try:
             # save some meta info related to the training and experiment:
             with open(os.path.join(self.experiment_dir, 'meta.txt'), 'w') as f:
-                f.write('Training on {} started on {} and finished on {}'.format(self.experiment_name,
-                                                                                 training_starttime,
-                                                                                 datetime.now().isoformat()))
+                f.write("Training on {} started on {} and finished on {}\n".format(self.experiment_name,
+                                                                                   training_starttime,
+                                                                                   datetime.now().isoformat()))
+                meta_info = meta_info or {}
+                f.write("Model initialisation from: {}\n".format(meta_info.get('pretrained_model', 'random state')))
+                f.write("Optimiser parameters: {}\n".format(meta_info.get('opt_params', 'default (see model module)')))
             if loss_history is not None:
                 savez(os.path.join(self.experiment_dir, 'loss.npz'), **loss_history)
                 self._plot_loss(loss_history)
         except IOError:
             logger.error("Saving train history and other meta-information failed.")
 
-    def run_training(self, data, batch_size=32, epochs=1, save_interrupted=False):
+    def run_training(self, data, batch_size=32, epochs=1, save_interrupted=False, **kwargs):
         """
         Run training of the model on training data.
         
@@ -126,12 +135,15 @@ class ModelTrainer(object):
         training_starttime = self.prepare_training()
         loss_history = None
         try:
-            loss_history = self.fit_model(data, batch_size, epochs)
-            endmodel_dir = os.path.join(self.experiment_dir, 'final')
-            self.model.save(endmodel_dir)
+            loss_history = self.fit_model(data, batch_size, epochs,
+                                          checkpoint_callback=self.cb_checkpoint_best_model,
+                                          **kwargs)
+            end_model_dir = os.path.join(self.experiment_dir, 'final')
+            self.model.save(end_model_dir)
         except KeyboardInterrupt:
             if save_interrupted:
-                interrupted_dir = os.path.join(self.experiment_dir, 'interrupted_{}'.format(datetime.now().isoformat()))
+                interrupted_dir = os.path.join(self.experiment_dir,
+                                               'interrupted_{}'.format(datetime.now().isoformat()))
                 self.model.save(interrupted_dir)
                 logger.warning("Training has been interrupted and the model "
                                "has been dumped in {}.".format(interrupted_dir))
@@ -141,14 +153,18 @@ class ModelTrainer(object):
             self.finalise_training(training_starttime, loss_history)
             return self.experiment_dir
 
-    def fit_model(self, data, batch_size, epochs):
+    def fit_model(self, data, batch_size, epochs, **kwargs):
         """
         Fit particular model to the training data. Should be implemented by each model separately.
         
         Args:
-            data: ndarray, the training data array
+            data: ndarray, the training data array (or tuple of such)
             batch_size: int, the number of samples for one iteration
             epochs: int, number of whole data iterations per training
+
+        Keyword Args:
+            validation_data: ndarray, validation data array (or tuple of such)
+            validation_frequency: int, after how many epoch the model should be validated
 
         Returns:
             Model history dict object with the training losses.
@@ -161,8 +177,8 @@ class AVBModelTrainer(ModelTrainer):
     ModelTrainer class for the AVBModel.
     """
     def __init__(self, data_dim, latent_dim, noise_dim, experiment_name, architecture,
-                 schedule=None, pretrained_dir=None, overwrite=True, use_adaptive_contrast=False,
-                 noise_basis_dim=None, optimiser_params=None):
+                 schedule=None, pretrained_dir=None, overwrite=True, save_best=True,
+                 use_adaptive_contrast=False, noise_basis_dim=None, optimiser_params=None):
         """
         Args:
             data_dim: int, flattened data dimensionality 
@@ -172,19 +188,21 @@ class AVBModelTrainer(ModelTrainer):
             architecture: str, name of the network architecture to be used
             schedule: dict, schedule of training discriminator and encoder-decoder networks
             overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
+            save_best: bool, whether to save the best performing model on the validation set (if provided later)
             use_adaptive_contrast: bool, whether to train according to the Adaptive Contrast algorithm
             noise_basis_dim: int, the dimensionality of the noise basis vectors if AC is used.
             optimiser_params: dict, parameters for the optimiser
             pretrained_dir: str, directory from which pre-trained models (hdf5 files) can be loaded
         """
-        avb = AdversarialVariationalBayes(data_dim=data_dim, latent_dim=latent_dim, noise_dim=noise_dim,
-                                          noise_basis_dim=noise_basis_dim,
-                                          use_adaptive_contrast=use_adaptive_contrast,
-                                          optimiser_params=optimiser_params,
-                                          resume_from=pretrained_dir,
-                                          experiment_architecture=architecture)
+        avb_model = AdversarialVariationalBayes(data_dim=data_dim, latent_dim=latent_dim, noise_dim=noise_dim,
+                                                noise_basis_dim=noise_basis_dim,
+                                                use_adaptive_contrast=use_adaptive_contrast,
+                                                optimiser_params=optimiser_params,
+                                                resume_from=pretrained_dir,
+                                                experiment_architecture=architecture)
         self.schedule = schedule or {'iter_discr': 1, 'iter_encdec': 1}
-        super(AVBModelTrainer, self).__init__(model=avb, experiment_name=experiment_name, overwrite=overwrite)
+        super(AVBModelTrainer, self).__init__(model=avb_model, experiment_name=experiment_name,
+                                              overwrite=overwrite, save_best=save_best)
 
     def fit_model(self, data, batch_size, epochs, **kwargs):
         """
@@ -194,15 +212,13 @@ class AVBModelTrainer(ModelTrainer):
             data: ndarray, training data
             batch_size: int, batch size
             epochs: int, number of epochs
-        
-        Keyword Args:
 
         Returns:
             A loss history dict with discriminator and encoder-decoder losses.
         """
         loss_hisotry = self.model.fit(data, batch_size, epochs=epochs,
                                       discriminator_repetitions=self.schedule['iter_discr'],
-                                      adaptive_contrast_sampling_steps=10)
+                                      adaptive_contrast_sampling_steps=10, **kwargs)
         return loss_hisotry
 
 
@@ -212,7 +228,7 @@ class VAEModelTrainer(ModelTrainer):
     """
 
     def __init__(self, data_dim, latent_dim, experiment_name, architecture, overwrite=True,
-                 optimiser_params=None, pretrained_dir=None):
+                 save_best=True, optimiser_params=None, pretrained_dir=None):
         """
         Args:
             data_dim: int, flattened data dimensionality 
@@ -220,6 +236,7 @@ class VAEModelTrainer(ModelTrainer):
             experiment_name: str, name of the training/experiment for logging purposes
             architecture: str, name of the network architecture to be used
             overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
+            save_best: bool, whether to save the best performing model on the validation set (if provided later)
             optimiser_params: dict, parameters for the optimiser
             pretrained_dir: str, optional path to the pre-trained model directory with the hdf5 and json files
         """
@@ -227,7 +244,8 @@ class VAEModelTrainer(ModelTrainer):
                                              experiment_architecture=architecture,
                                              optimiser_params=optimiser_params,
                                              resume_from=pretrained_dir)
-        super(VAEModelTrainer, self).__init__(model=vae, experiment_name=experiment_name, overwrite=overwrite)
+        super(VAEModelTrainer, self).__init__(model=vae, experiment_name=experiment_name,
+                                              overwrite=overwrite, save_best=save_best)
 
     def fit_model(self, data, batch_size, epochs, **kwargs):
         """
@@ -238,12 +256,10 @@ class VAEModelTrainer(ModelTrainer):
             batch_size: int, batch size
             epochs: int, number of epochs
 
-        Keyword Args:
-
         Returns:
             A loss history dict with the encoder-decoder loss.
         """
-        loss_hisotry = self.model.fit(data, batch_size, epochs=epochs)
+        loss_hisotry = self.model.fit(data, batch_size, epochs=epochs, **kwargs)
         return loss_hisotry
 
 
@@ -252,8 +268,8 @@ class ConjointVAEModelTrainer(ModelTrainer):
     ModelTrainer class for the Conjoint Variational Autoencoder.
     """
 
-    def __init__(self, data_dims, latent_dims, experiment_name, architecture, overwrite=True,
-                 optimiser_params=None, pretrained_dir=None):
+    def __init__(self, data_dims, latent_dims, experiment_name, architecture,
+                 optimiser_params=None, overwrite=True, save_best=True, pretrained_dir=None):
         """
         Args:
             data_dims: int, flattened data dimensionality
@@ -261,6 +277,7 @@ class ConjointVAEModelTrainer(ModelTrainer):
             experiment_name: str, name of the training/experiment for logging purposes
             architecture: str, name of the network architecture to be used
             overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
+            save_best: bool, whether to save the best performing model on the validation set (if provided later)
             optimiser_params: dict, parameters for the optimiser
             pretrained_dir: str, optional path to the pre-trained model directory with the hdf5 and json files
         """
@@ -269,59 +286,9 @@ class ConjointVAEModelTrainer(ModelTrainer):
                                                           optimiser_params=optimiser_params,
                                                           resume_from=pretrained_dir)
         super(ConjointVAEModelTrainer, self).__init__(model=conj_vae, experiment_name=experiment_name,
-                                                      overwrite=overwrite)
+                                                      overwrite=overwrite, save_best=save_best)
 
-    def fit_model(self, data, batch_size, epochs):
-        """
-        Fit the Conjoint VAE model to multiple datasets.
-
-        Args:
-            data:
-            batch_size:
-            epochs:
-
-        Returns:
-
-        """
-        loss_hisotry = self.model.fit(data, batch_size, epochs=epochs)
-        return loss_hisotry
-
-
-class ConjointAVBModelTrainer(ModelTrainer):
-    """
-    ModelTrainer class for the Conjoint Variational Autoencoder.
-    """
-
-    def __init__(self, data_dims, latent_dims, noise_dim, experiment_name, architecture,
-                 schedule=None, pretrained_dir=None, overwrite=True, use_adaptive_contrast=False,
-                 noise_basis_dim=None, optimiser_params=None, noise_mode='add'):
-        """
-        Args:
-            data_dims: tuple, all flattened data dimensionalities for each dataset
-            latent_dims: tuple, all private and the shared latent dimensionalities for each dataset
-            noise_dim: int, flattened noise dimensionality
-            experiment_name: str, name of the training/experiment for logging purposes
-            architecture: str, name of the network architecture to be used
-            schedule: dict, schedule of training discriminator and encoder-decoder networks
-            overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
-            use_adaptive_contrast: bool, whether to train according to the Adaptive Contrast algorithm
-            noise_basis_dim: int, the dimensionality of the noise basis vectors if AC is used.
-            optimiser_params: dict, parameters for the optimiser
-            pretrained_dir: str, directory from which pre-trained models (hdf5 files) can be loaded
-            noise_mode: str, the way the noise will be merged with the input('add', 'concat', 'product')
-        """
-        conj_avb = ConjointAdversarialVariationalBayes(data_dims=data_dims, latent_dims=latent_dims, noise_dim=noise_dim,
-                                                       noise_basis_dim=noise_basis_dim,
-                                                       noise_mode=noise_mode,
-                                                       use_adaptive_contrast=use_adaptive_contrast,
-                                                       optimiser_params=optimiser_params,
-                                                       resume_from=pretrained_dir,
-                                                       experiment_architecture=architecture)
-        self.schedule = schedule or {'iter_discr': 1, 'iter_encdec': 1}
-        super(ConjointAVBModelTrainer, self).__init__(model=conj_avb, experiment_name=experiment_name,
-                                                      overwrite=overwrite)
-
-    def fit_model(self, data, batch_size, epochs):
+    def fit_model(self, data, batch_size, epochs, **kwargs):
         """
         Fit the Conjoint VAE model to multiple datasets.
 
@@ -331,9 +298,62 @@ class ConjointAVBModelTrainer(ModelTrainer):
             epochs: int, number of epochs
 
         Returns:
+            A loss history dict with the encoder-decoder loss.
+        """
+        loss_hisotry = self.model.fit(data, batch_size, epochs=epochs, **kwargs)
+        return loss_hisotry
 
+
+class ConjointAVBModelTrainer(ModelTrainer):
+    """
+    ModelTrainer class for the Conjoint Variational Autoencoder.
+    """
+
+    def __init__(self, data_dims, latent_dims, noise_dim, experiment_name, architecture,
+                 use_adaptive_contrast=False, noise_basis_dim=None, noise_mode='add', 
+                 optimiser_params=None, schedule=None, pretrained_dir=None, overwrite=True, save_best=True,):
+        """
+        Args:
+            data_dims: tuple, all flattened data dimensionalities for each dataset
+            latent_dims: tuple, all private and the shared latent dimensionalities for each dataset
+            noise_dim: int, flattened noise dimensionality
+            experiment_name: str, name of the training/experiment for logging purposes
+            architecture: str, name of the network architecture to be used
+            schedule: dict, schedule of training discriminator and encoder-decoder networks
+            overwrite: bool, whether to overwrite the existing trained model with the same experiment_name
+            save_best: bool, whether to save the best performing model on the validation set (if provided later)
+            use_adaptive_contrast: bool, whether to train according to the Adaptive Contrast algorithm
+            noise_basis_dim: int, the dimensionality of the noise basis vectors if AC is used.
+            optimiser_params: dict, parameters for the optimiser
+            pretrained_dir: str, directory from which pre-trained models (hdf5 files) can be loaded
+            noise_mode: str, the way the noise will be merged with the input('add', 'concat', 'product')
+        """
+        conj_avb = ConjointAdversarialVariationalBayes(data_dims=data_dims, latent_dims=latent_dims,
+                                                       noise_dim=noise_dim,
+                                                       noise_basis_dim=noise_basis_dim,
+                                                       noise_mode=noise_mode,
+                                                       use_adaptive_contrast=use_adaptive_contrast,
+                                                       optimiser_params=optimiser_params,
+                                                       resume_from=pretrained_dir,
+                                                       experiment_architecture=architecture)
+        self.schedule = schedule or {'iter_discr': 1, 'iter_encdec': 1}
+        super(ConjointAVBModelTrainer, self).__init__(model=conj_avb, experiment_name=experiment_name,
+                                                      overwrite=overwrite, save_best=save_best)
+
+    def fit_model(self, data, batch_size, epochs, **kwargs):
+        """
+        Fit the Conjoint VAE model to multiple datasets.
+
+        Args:
+            data: ndarray, training data
+            batch_size: int, batch size
+            epochs: int, number of epochs
+
+        Returns:
+            A loss history dict with the encoder-decoder loss.
         """
         loss_hisotry = self.model.fit(data, batch_size, epochs=epochs,
                                       discriminator_repetitions=self.schedule['iter_discr'],
-                                      adaptive_contrast_sampling_steps=10)
+                                      adaptive_contrast_sampling_steps=10,
+                                      **kwargs)
         return loss_hisotry

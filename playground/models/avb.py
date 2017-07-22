@@ -1,10 +1,9 @@
 from __future__ import absolute_import
 from builtins import range, next
 
-import numpy as np
-import os
+from numpy import inf as float_inf
+from tqdm import tqdm, trange
 from keras.optimizers import Adam
-from tqdm import tqdm
 
 from ..utils.config import load_config
 from .losses import AVBDiscriminatorLossLayer, AVBEncoderDecoderLossLayer
@@ -14,7 +13,6 @@ from ..models.base_vae import BaseVariationalAutoencoder
 from ..models.freezable import FreezableModel
 
 config = load_config('global_config.yaml')
-np.random.seed(config['seed'])
 
 
 class AdversarialVariationalBayes(BaseVariationalAutoencoder):
@@ -142,20 +140,25 @@ class AdversarialVariationalBayes(BaseVariationalAutoencoder):
         Keyword Args:
             discriminator_repetitions: int, gives the number of iterations for the discriminator network 
                 for each batch training of the encoder-decoder network 
-            checkpoint_best: bool, whether to look at the loss and save the improving model
+            checkpoint_callback: function, python function to execute when performance is improved
+            validation_data: ndarray, validation data to monitor the model performance
+            validation_frequency: int, after how many epochs the model should be validated
+            validation_sampling_size: int, number of noisy computations for each validation sample
 
         Returns:
             The training history as a dict of lists of the epoch-wise losses.
         """
         discriminator_repetitions = kwargs.get('discriminator_repetitions', 1)
-        # NOTE: checkpointing based on the loss doesn't make much sense in this case.
-        # TODO: Maybe fix with some sort of ELBO estimation validation in the future
-        checkpoint_best = kwargs.get('checkpoint_best', False)
-        data_iterator, iters_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
-        history = {'encoderdecoder_loss': [], 'discriminator_loss': []}
-        epoch_loss = np.inf
+        val_data = kwargs.get('validation_data', None)
+        val_freq = kwargs.get('validation_frequency', 10)
+        val_sampling_size = kwargs.get('validation_sampling_size', 10)
+        checkpoint_callback = kwargs.get('checkpoint_callback', None)
 
-        for ep in tqdm(range(epochs)):
+        data_iterator, iters_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
+
+        history = {'encoder_decoder_loss': [], 'discriminator_loss': [], 'elbo': []}
+        current_best_score = -float_inf
+        for ep in trange(epochs):
             epoch_loss_history_encdec = []
             epoch_loss_history_disc = []
             for it in range(iters_per_epoch):
@@ -166,13 +169,21 @@ class AdversarialVariationalBayes(BaseVariationalAutoencoder):
                     loss_discriminator = self.avb_trainable_discriminator.train_on_batch(training_batch, None)
                     epoch_loss_history_disc.append(loss_discriminator)
 
-            if checkpoint_best:
-                current_epoch_loss = np.mean(epoch_loss_history_encdec) + np.mean(epoch_loss_history_disc)
-                if current_epoch_loss < 0.9 * epoch_loss:
-                    epoch_loss = current_epoch_loss
-                    self.save(os.path.join(config['temp_dir'], 'ep_{}_loss_{}'.format(ep, epoch_loss)))
-            history['encoderdecoder_loss'].append(epoch_loss_history_encdec)
+            history['encoder_decoder_loss'].append(epoch_loss_history_encdec)
             history['discriminator_loss'].append(epoch_loss_history_disc)
+
+            if val_data is not None and (ep + 1) % val_freq == 0:
+                elbo, kl_marginal, rec_err = self.evaluate(val_data, batch_size=batch_size,
+                                                           sampling_size=val_sampling_size,
+                                                           verbose=False)
+                # possibly think of some combination of all three metrics for the score calculation
+                score = elbo
+                tqdm.write("ELBO estimate: {}, Posterior abnormality: {}, "
+                           "Reconstruction error: {}".format(elbo, kl_marginal, rec_err))
+                if checkpoint_callback is not None and score > current_best_score:
+                    checkpoint_callback()
+                    current_best_score = score
+                history['elbo'].append(elbo)
 
         return history
 
@@ -284,20 +295,25 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
         Keyword Args:
             discriminator_repetitions: int, gives the number of iterations for the discriminator network
                 for each batch training of the encoder-decoder network
-            checkpoint_best: bool, whether to look at the loss and save the improving model
+            checkpoint_callback: function, python function to execute when performance is improved
+            validation_data: ndarray, validation data to monitor the model performance
+            validation_frequency: int, after how many epochs the model should be validated
+            validation_sampling_size: int, number of noisy computations for each validation sample
 
         Returns:
             The training history as a dict of lists of the epoch-wise losses.
         """
         discriminator_repetitions = kwargs.get('discriminator_repetitions', 1)
-        # NOTE: checkpointing based on the loss doesn't make much sense in this case.
-        # TODO: Maybe fix with some sort of ELBO estimation validation in the future
-        checkpoint_best = kwargs.get('checkpoint_best', False)
-        data_iterator, iters_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
-        history = {'encoderdecoder_loss': [], 'discriminator_loss': []}
-        epoch_loss = np.inf
+        val_data = kwargs.get('validation_data', None)
+        val_freq = kwargs.get('validation_frequency', 10)
+        val_sampling_size = kwargs.get('validation_sampling_size', 10)
+        checkpoint_callback = kwargs.get('checkpoint_callback', None)
 
-        for ep in tqdm(range(epochs)):
+        data_iterator, iters_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
+
+        history = {'encoder_decoder_loss': [], 'discriminator_loss': [], 'elbo': []}
+        current_best_score = -float_inf
+        for ep in trange(epochs):
             epoch_loss_history_encdec = []
             epoch_loss_history_disc = []
             for it in range(iters_per_epoch):
@@ -308,12 +324,20 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
                     loss_discriminator = self.avb_trainable_discriminator.train_on_batch(training_batch, None)
                     epoch_loss_history_disc.append(loss_discriminator)
 
-            if checkpoint_best:
-                current_epoch_loss = np.mean(epoch_loss_history_encdec) + np.mean(epoch_loss_history_disc)
-                if current_epoch_loss < 0.9 * epoch_loss:
-                    epoch_loss = current_epoch_loss
-                    self.save(os.path.join(config['temp_dir'], 'ep_{}_loss_{}'.format(ep, epoch_loss)))
-            history['encoderdecoder_loss'].append(epoch_loss_history_encdec)
+            history['encoder_decoder_loss'].append(epoch_loss_history_encdec)
             history['discriminator_loss'].append(epoch_loss_history_disc)
+
+            if val_data is not None and (ep + 1) % val_freq == 0:
+                elbo, kl_marginal, rec_err = self.evaluate(val_data, batch_size=batch_size,
+                                                           sampling_size=val_sampling_size,
+                                                           verbose=False)
+                # possibly think of some combination of all three metrics for the score calculation
+                score = elbo
+                tqdm.write("ELBO estimate: {}, Posterior abnormality: {}, "
+                           "Reconstruction error: {}".format(elbo, kl_marginal, rec_err))
+                if checkpoint_callback is not None and score > current_best_score:
+                    checkpoint_callback()
+                    current_best_score = score
+                history['elbo'].append(elbo)
 
         return history
