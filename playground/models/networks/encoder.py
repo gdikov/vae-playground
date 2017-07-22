@@ -139,8 +139,8 @@ class StandardConjointEncoder(object):
             assert data_dims[0] == noise_dim and data_dims[1] == noise_dim, \
                 "Expected to receive a noise_dim that is equal to the given inputs dimensions. " \
                 "Received {} noise and {} data dimensions.".format(noise_dim, data_dims)
-        else:
-            raise ValueError("Only the noise modes 'add', 'concat' and 'product' are available.")
+        elif noise_mode != 'add':
+            raise ValueError("Only the noise modes 'add', 'concatenate' and 'product' are available.")
         standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': noise_mode}
 
         for i, inp in enumerate(inputs):

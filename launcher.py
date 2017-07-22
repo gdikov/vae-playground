@@ -14,7 +14,7 @@ from keras.backend import clear_session
 # set_session(tf.Session(config=config))
 
 
-def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='concat'):
+def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='product'):
     logger.info("Starting a conjoint model experiment on the synthetic dataset.")
     data_dims = (8, 8)
     latent_dims = (2, 2, 2)
@@ -28,8 +28,9 @@ def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='con
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=data_dims[0],
                                           use_adaptive_contrast=False,
-                                          optimiser_params={'encdec': {'lr': 3e-4, 'beta_1': 0.5},
-                                                            'disc': {'lr': 3e-4, 'beta_1': 0.5}},
+                                          optimiser_params={'encdec': {'lr': 1e-3, 'beta_1': 0.5},
+                                                            'disc': {'lr': 1e-3, 'beta_1': 0.5}},
+                                          schedule={'iter_discr': 3, 'iter_encdec': 1},
                                           overwrite=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='synthetic',
@@ -38,7 +39,7 @@ def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='con
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(data, batch_size=16, epochs=1000, save_interrupted=True)
+    model_dir = trainer.run_training(data, batch_size=4, epochs=1000, save_interrupted=True)
     # model_dir = './output/tmp'
     trained_model = trainer.get_model()
 
