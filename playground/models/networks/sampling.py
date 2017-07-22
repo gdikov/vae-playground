@@ -9,10 +9,9 @@ def outer_product(inputs):
         for which you need to compute the outer product
     """
     x, y = inputs
-    feature_size = x._shape_as_list()[1] ** 2
-    outer_Product = x[:,:, newaxis] * y[:,newaxis,:]
+    feature_size = K.shape(x)[1] ** 2
+    outer_Product = x[:, :, newaxis] * y[:, newaxis, :]
     outer_Product = K.reshape(outer_Product, (-1, feature_size))
-    #outerProduct = K.reshape(outerProduct, (batchSize, -1))
     # returns a flattened batch-wise set of tensors
     return outer_Product
 
