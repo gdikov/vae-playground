@@ -14,7 +14,7 @@ from keras.backend import clear_session
 # set_session(tf.Session(config=config))
 
 
-def run_synthetic_experiment(model='avb', pretrained_model=None):
+def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='concat'):
     logger.info("Starting a conjoint model experiment on the synthetic dataset.")
     data_dims = (8, 8)
     latent_dims = (2, 2, 2)
@@ -28,16 +28,17 @@ def run_synthetic_experiment(model='avb', pretrained_model=None):
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=data_dims[0],
                                           use_adaptive_contrast=False,
-                                          optimiser_params={'encdec': {'lr': 1e-3, 'beta_1': 0.5},
-                                                            'disc': {'lr': 1e-3, 'beta_1': 0.5}},
+                                          optimiser_params={'encdec': {'lr': 3e-4, 'beta_1': 0.5},
+                                                            'disc': {'lr': 3e-4, 'beta_1': 0.5}},
                                           overwrite=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='synthetic',
-                                          experiment_name='synthetic')
+                                          experiment_name='synthetic',
+                                          noise_mode=noise_mode)
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(data, batch_size=16, epochs=1000, save_interrupted=True)
+    model_dir = trainer.run_training(data, batch_size=16, epochs=100, save_interrupted=True)
     # model_dir = './output/tmp'
     trained_model = trainer.get_model()
 
@@ -141,5 +142,5 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
 
 
 if __name__ == '__main__':
-    # run_synthetic_experiment(model='avb')
-    run_mnist_experiment(model='avb')
+    run_synthetic_experiment(model='avb', noise_mode='product')
+    # run_mnist_experiment(model='avb')

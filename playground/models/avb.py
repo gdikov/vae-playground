@@ -195,6 +195,7 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
     """
 
     def __init__(self, data_dims, latent_dims, noise_dim=None,
+                 noise_mode='add',
                  resume_from=None,
                  experiment_architecture='synthetic',
                  use_adaptive_contrast=False,
@@ -205,6 +206,7 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
             data_dims: int, flattened data dimensionality
             latent_dims: int, flattened latent dimensionality
             noise_dim: int, flattened noise, dimensionality
+            noise_mode: str, the way the noise will be merged with the input('add', 'concat', 'product')
             resume_from: str, directory with h5 and json files with the model weights and architecture
             experiment_architecture: str, network architecture descriptor
             use_adaptive_contrast: bool, whether to use an auxiliary distribution with known density,
@@ -225,7 +227,7 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
         else:
             self.name = "conjoint_avb"
             self.encoder = StandardConjointEncoder(data_dims=data_dims, noise_dim=noise_dim, latent_dims=latent_dims,
-                                                   network_architecture=experiment_architecture)
+                                                   network_architecture=experiment_architecture, noise_mode=noise_mode)
             self.discriminator = ConjointDiscriminator(data_dims=data_dims, latent_dims=latent_dims,
                                                        network_architecture=experiment_architecture)
         self.decoder = ConjointDecoder(latent_dims=latent_dims, data_dims=data_dims,

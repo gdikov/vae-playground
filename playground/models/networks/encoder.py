@@ -5,6 +5,7 @@ import logging
 import keras.backend as ker
 
 from numpy import pi as pi_const
+from numpy import sqrt
 from keras.layers import Lambda, Multiply, Add, Dense, Concatenate
 from keras.models import Input
 from keras.models import Model
@@ -107,7 +108,7 @@ class StandardConjointEncoder(object):
 
         """
 
-    def __init__(self, data_dims, noise_dim, latent_dims, network_architecture='synthetic'):
+    def __init__(self, data_dims, noise_dim, latent_dims, network_architecture='synthetic', noise_mode='add'):
         """
         Args:
             data_dims: tuple, flattened data dimension for each dataset
@@ -115,6 +116,7 @@ class StandardConjointEncoder(object):
             latent_dims: tuple, flattened latent dimensions for each private latent space and the dimension
                 of the shared space.
             network_architecture: str, the codename of the encoder network architecture (will be the same for all)
+            noise_mode: str, the way the noise will be merged with the input('add', 'concat', 'product')
         """
         assert len(latent_dims) == len(data_dims) + 1, \
             "Expected too receive {} private latent spaces and one shared for {} data inputs " \
@@ -127,10 +129,22 @@ class StandardConjointEncoder(object):
         latent_space, features = [], []
         inputs = [Input(shape=(dim,), name="enc_data_input_{}".format(i)) for i, dim in enumerate(data_dims)]
         standard_normal_sampler = Lambda(sample_standard_normal_noise, name='enc_normal_sampler')
-        if network_architecture == 'synthetic':
-            standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'concatenate'}
-        else:
+        if noise_mode == 'add':
             standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'add'}
+        elif noise_mode == 'concat':
+            if network_architecture == 'mnist':
+                assert ((noise_dim % sqrt(data_dims[0]) == 0) and (noise_dim % sqrt(data_dims[1]) == 0)), \
+                'Expected to receive a noise_dim that can form a rectangle with the given inputs_dims. Received {} as noise' \
+                'and {} and {} for the data dimension.'.format(noise_dim, data_dims[0], data_dims[1])
+            standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'concatenate'}
+        elif noise_mode == 'product':
+            assert data_dims[0] == noise_dim and data_dims[1] == noise_dim, \
+            'Expected to receive a noise_dim that is equal to the given inputs_dims. Received {} as noise' \
+            'and {} and {} for the data dimension.'.format(noise_dim, data_dims[0], data_dims[1])
+            standard_normal_sampler.arguments = {'seed': config['seed'], 'noise_dim': noise_dim, 'mode': 'product'}
+        else:
+            raise ValueError("Only the noise modes 'add', 'concat' and 'product' are available.")
+
         for i, inp in enumerate(inputs):
             noise_input = standard_normal_sampler(inp)
             feature = get_network_by_name['conjoint_encoder'][network_architecture](noise_input,

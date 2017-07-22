@@ -310,8 +310,8 @@ class ConjointAVBModelTrainer(ModelTrainer):
     """
 
     def __init__(self, data_dims, latent_dims, noise_dim, experiment_name, architecture,
-                 schedule=None, pretrained_dir=None, overwrite=True, save_best=True,
-                 use_adaptive_contrast=False, noise_basis_dim=None, optimiser_params=None):
+                 use_adaptive_contrast=False, noise_basis_dim=None, noise_mode='add', 
+                 optimiser_params=None, schedule=None, pretrained_dir=None, overwrite=True, save_best=True,):
         """
         Args:
             data_dims: tuple, all flattened data dimensionalities for each dataset
@@ -326,10 +326,12 @@ class ConjointAVBModelTrainer(ModelTrainer):
             noise_basis_dim: int, the dimensionality of the noise basis vectors if AC is used.
             optimiser_params: dict, parameters for the optimiser
             pretrained_dir: str, directory from which pre-trained models (hdf5 files) can be loaded
+            noise_mode: str, the way the noise will be merged with the input('add', 'concat', 'product')
         """
         conj_avb = ConjointAdversarialVariationalBayes(data_dims=data_dims, latent_dims=latent_dims,
                                                        noise_dim=noise_dim,
                                                        noise_basis_dim=noise_basis_dim,
+                                                       noise_mode=noise_mode,
                                                        use_adaptive_contrast=use_adaptive_contrast,
                                                        optimiser_params=optimiser_params,
                                                        resume_from=pretrained_dir,
