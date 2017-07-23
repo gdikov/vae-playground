@@ -24,7 +24,7 @@ DATA_DIR = config['data_dir']
 np.random.seed(config['seed'])
 
 
-def load_usps(local_data_path=None):
+def load_usps(local_data_path=None, one_hot=True, scale_data=True):
     """
     Load the USPS dataset from local file or download it if not available.
     
@@ -54,6 +54,11 @@ def load_usps(local_data_path=None):
         else:
             logger.error("Path to locally stored USPS dataset does not exist.")
             raise ValueError
+        usps['data'] = np.swapaxes(usps['data'], 0, 1)
+        if not one_hot:
+            usps['target'] = np.argmax(usps['target'], axis=1)
+        if scale_data:
+            usps['data'] = usps['data'] / 255
 
     return usps
 
