@@ -362,6 +362,27 @@ def mnist_discriminator_simple(data_dim, latent_dim, name_prefix=''):
     return discriminator_model
 
 
+""" Architectures for experiments on the USPS - MNIST datasets. """
+
+def usps_mnist_conjoint_encoder(inputs, name_prefix=''):
+    # center the input around 0
+    centered_data = Lambda(lambda x: 2 * x - 1, name=name_prefix + 'enc_centering_data_input')(inputs)
+    data_size = inputs.get_shape()[1].value
+    if data_size == 784:
+        side_size = 28
+    elif data_size == 256:
+        side_size = 16
+    else:
+        raise ValueError("The input shape does not fit the expected values for USPS or MNIST.")
+    convnet_input = Reshape((side_size, side_size, 1), name=name_prefix + 'rep_enc_data_reshape')(centered_data)
+    conv_output = deflating_convolution(convnet_input, n_deflation_layers=3,
+                                        n_filters_init=64, name_prefix=name_prefix + 'rep_enc_data_body')
+    latent_factors = Reshape((-1,), name=name_prefix + 'rep_enc_data_features_reshape')(conv_output)
+    latent_factors = Dense(800, activation='relu', name=name_prefix + 'rep_enc_expanding_before_latent')(latent_factors)
+    return latent_factors
+
+
+
 get_network_by_name = {'encoder': {'synthetic': synthetic_encoder,
                                    'mnist': mnist_encoder,
                                    'mnist_simple': mnist_encoder_simple},
@@ -369,7 +390,8 @@ get_network_by_name = {'encoder': {'synthetic': synthetic_encoder,
                                                   'mnist': mnist_reparametrized_encoder,
                                                   'mnist_simple': mnist_reparametrized_encoder_simple},
                        'conjoint_encoder': {'synthetic': synthetic_conjoint_encoder,
-                                            'mnist': mnist_conjoint_encoder},
+                                            'mnist': mnist_conjoint_encoder,
+                                            'usps_mnist': usps_mnist_conjoint_encoder},
                        'moment_estimation_encoder': {'synthetic': synthetic_moment_estimation_encoder,
                                                      'mnist': mnist_moment_estimation_encoder},
 
@@ -377,8 +399,8 @@ get_network_by_name = {'encoder': {'synthetic': synthetic_encoder,
                                    'mnist': mnist_decoder,
                                    'mnist_simple': mnist_decoder_simple},
                        'conjoint_decoder': {'synthetic': synthetic_decoder,
-                                            'mnist': mnist_decoder},
-
+                                            'mnist': mnist_decoder,
+                                            'usps_mnist': mnist_decoder,},
                        'discriminator': {'synthetic': synthetic_discriminator,
                                          'mnist': mnist_discriminator_simple,
                                          'mnist_simple': mnist_discriminator_simple},
