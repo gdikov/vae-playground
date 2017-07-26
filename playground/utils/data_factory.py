@@ -180,7 +180,19 @@ class CustomMNIST(object):
         return augmented_data
 
     def augment(self, style_distribution=None, **kwargs):
-        raise NotImplementedError
+        augmented_data = {'data': [], 'target': [], 'tag': []}
+        style_distribution = self._get_style_distro(style_distribution)
+        data_size = self.data['target'].shape[0]
+        s_ids = np.random.choice(self.styles.size, size=data_size, replace=True, p=style_distribution)
+        for id in range(data_size):
+            s_id = s_ids[id]
+            new_sample_background = self._generate_style(style=s_id, **kwargs)
+            newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
+            augmented_data['data'].append(newly_composed_digit)
+            augmented_data['target'].append(id)
+            augmented_data['tag'].append(new_sample_background['tag'])
+
+        return augmented_data
 
     # TODO: style_distribiution = None does not work at the moment. Style 3 not implemented
     def _get_style_distro(self, style_distribution):
