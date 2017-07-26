@@ -179,14 +179,24 @@ class CustomMNIST(object):
 
         return augmented_data
 
-    def augment(self, style_distribution=None, **kwargs):
+    def augment(self, style_distribution=None):
+        """
+        Generate backgrounds for MNIST images, without changing their order
+        
+        Args:
+            style_distribution: list, array of percentage generations for each style (uniform if None)
+
+        Returns:
+            A tuple of a dict with `data`, `target` and `style` keys and a verbal descriptions of the style encoding.
+        """
+
         augmented_data = {'data': [], 'target': [], 'tag': []}
         style_distribution = self._get_style_distro(style_distribution)
         data_size = self.data['target'].shape[0]
         s_ids = np.random.choice(self.styles.size, size=data_size, replace=True, p=style_distribution)
         for id in range(data_size):
             s_id = s_ids[id]
-            new_sample_background = self._generate_style(style=s_id, **kwargs)
+            new_sample_background = self._generate_style(style=s_id)
             newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
             augmented_data['data'].append(newly_composed_digit)
             augmented_data['target'].append(id)
@@ -213,7 +223,7 @@ class CustomMNIST(object):
 
     @staticmethod
     def save_dataset(new_data, tag):
-        assert isinstance(new_data, dict), "Provida a dict data containing at least the keys `data` and `target`."
+        assert isinstance(new_data, dict), "Provide a dict data containing at least the keys `data` and `target`."
         new_data_path = os.path.join(DATA_DIR, 'MNIST_Custom_Variations')
         if not os.path.exists(new_data_path):
             os.makedirs(new_data_path)
