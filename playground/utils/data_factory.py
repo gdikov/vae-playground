@@ -115,8 +115,8 @@ class CustomMNIST(object):
     Factory for customized MNIST digits. Background will have different structure/style.
     """
 
-    def __init__(self):
-        self.data = load_mnist(one_hot=False, binarised=False, rotated=False, background=None, large_set=True)
+    def __init__(self, large_set=True):
+        self.data = load_mnist(one_hot=False, binarised=False, rotated=False, background=None, large_set=large_set)
         self.unique_labels = np.arange(10)
         # group the targets of each dataset by label
         sorted_indices = np.argsort(self.data['target'])
