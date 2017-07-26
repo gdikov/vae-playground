@@ -94,22 +94,22 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
         experiment_name = 'mnist_variation_two_backgrounds_per_encoder'
         if small_set:
             local_path_0 = 'data/MNIST_Custom_Variations/strippy_horizontal_and_vertical_small.npz'
-            local_path_1 = 'data/MNIST_Custom_Variations/trippy_and_mandelbrot_small.npz'
+            local_path_1 = 'data/MNIST_Custom_Variations/trippy_and_black_small.npz'
         else:
             local_path_0 = 'data/MNIST_Custom_Variations/strippy_horizontal_and_vertical.npz'
-            local_path_1 = 'data/MNIST_Custom_Variations/trippy_and_mandelbrot.npz'
+            local_path_1 = 'data/MNIST_Custom_Variations/trippy_and_black.npz'
         cmnist = None
         if not isfile(local_path_0):
-            cmnist = CustomMNIST()
+            cmnist = CustomMNIST(small_set)
             new_data = cmnist.augment([0, 1, 0, 0], orientation='vertical_or_horizontal')
             save_as = 'strippy_horizontal_and_vertical'
             if small_set: save_as += '_small'
             cmnist.save_dataset(new_data, save_as)
         data_0 = load_mnist(local_path_0, one_hot=False, binarised=False, background='custom')
         if not isfile(local_path_1):
-            if not cmnist: cmnist = CustomMNIST()
-            new_data = cmnist.augment([0.5, 0, 0.5, 0])
-            save_as = 'trippy_and_mandelbrot'
+            cmnist = CustomMNIST(small_set)
+            new_data = cmnist.augment([0.5, 0, 0.5, 0], no_mandelbrot=True)
+            save_as = 'trippy_and_black'
             if small_set: save_as += '_small'
             cmnist.save_dataset(new_data, save_as)
         data_1 = load_mnist(local_path_1, one_hot=False, binarised=False, background='custom')

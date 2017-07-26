@@ -117,8 +117,8 @@ class CustomMNIST(object):
     Factory for customized MNIST digits. Background will have different structure/style.
     """
 
-    def __init__(self, large_set=True):
-        self.data = load_mnist(one_hot=False, binarised=False, rotated=False, background=None, large_set=large_set)
+    def __init__(self, smallset=True):
+        self.data = load_mnist(one_hot=False, binarised=False, rotated=False, background=None, large_set=(not smallset))
         self.unique_labels = np.arange(10)
         # group the targets of each dataset by label
         sorted_indices = np.argsort(self.data['target'])
@@ -181,7 +181,7 @@ class CustomMNIST(object):
 
         return augmented_data
 
-    def augment(self, style_distribution=None,**kwargs):
+    def augment(self, style_distribution=None, no_mandelbrot=False, **kwargs):
         """
         Generate backgrounds for MNIST images, without changing their order
         
@@ -198,10 +198,15 @@ class CustomMNIST(object):
         s_ids = np.random.choice(self.styles.size, size=data_size, replace=True, p=style_distribution)
         for id in range(data_size):
             s_id = s_ids[id]
-            new_sample_background = self._generate_style(style=s_id,**kwargs)
-            newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
+            # Mandelbrot rendering takes forever and background is just black. Skip those
+            if s_id == 2 and no_mandelbrot:
+                newly_composed_digit = np.reshape(self.data['data'][id],(28,28))
+                new_sample_background = {'tag': 'black'}
+            else:
+                new_sample_background = self._generate_style(style=s_id, **kwargs)
+                newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
             augmented_data['data'].append(newly_composed_digit)
-            augmented_data['target'].append(id)
+            augmented_data['target'].append(self.data['target'][id])
             augmented_data['tag'].append(new_sample_background['tag'])
 
         return augmented_data
