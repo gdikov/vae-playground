@@ -23,15 +23,16 @@ def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='pro
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
                                           experiment_name='synthetic', architecture='synthetic',
-                                          overwrite=True, optimiser_params={'lr': 0.001},
+                                          overwrite=True, save_best=True, optimiser_params={'lr': 0.001},
                                           pretrained_dir=pretrained_model)
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=data_dims[0],
                                           use_adaptive_contrast=False,
                                           optimiser_params={'encdec': {'lr': 1e-3, 'beta_1': 0.5},
                                                             'disc': {'lr': 1e-3, 'beta_1': 0.5}},
-                                          schedule={'iter_discr': 3, 'iter_encdec': 1},
+                                          schedule={'iter_disc': 1, 'iter_encdec': 1},
                                           overwrite=True,
+                                          save_best=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='synthetic',
                                           experiment_name='synthetic',
@@ -39,7 +40,11 @@ def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='pro
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(data, batch_size=4, epochs=1000, save_interrupted=True)
+    model_dir = trainer.run_training(data, batch_size=4, epochs=1000,
+                                     save_interrupted=True,
+                                     validation_data=data,
+                                     validation_frequency=5,
+                                     validation_sampling_size=5)
     # model_dir = './output/tmp'
     trained_model = trainer.get_model()
 
@@ -77,8 +82,6 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
     logger.info("Starting a conjoint model experiment on the MNIST Variations dataset.")
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
-    # data_0 = load_mnist(one_hot=False, binarised=False, background=None, rotated=False)
-    # data_1 = load_mnist(one_hot=False, binarised=False, background='image', rotated=False)
     data_0 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_horizontal.npz',
                         one_hot=False, binarised=False, background='custom')
     data_1 = load_mnist(local_data_path='data/MNIST_Custom_Variations/strippy_checker.npz',
@@ -99,6 +102,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
                                           use_adaptive_contrast=False,
                                           optimiser_params={'encdec': {'lr': 1e-4, 'beta_1': 0.5},
                                                             'disc': {'lr': 2e-4, 'beta_1': 0.5}},
+                                          schedule={'iter_disc': 1, 'iter_encdec': 1},
                                           overwrite=True, save_best=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='mnist',
@@ -143,5 +147,5 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
 
 
 if __name__ == '__main__':
-    run_synthetic_experiment(model='avb', noise_mode='product')
-    # run_mnist_experiment(model='avb')
+    # run_synthetic_experiment(model='avb', noise_mode='product')
+    run_mnist_experiment(model='avb')

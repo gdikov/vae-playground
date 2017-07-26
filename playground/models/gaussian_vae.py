@@ -77,7 +77,8 @@ class GaussianVariationalAutoencoder(BaseVariationalAutoencoder):
         val_sampling_size = kwargs.get('validation_sampling_size', 10)
         checkpoint_callback = kwargs.get('checkpoint_callback', None)
 
-        data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
+        data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training',
+                                                                   shuffle=True, grouping_mode='by_pairs')
 
         history = {'vae_loss': [], 'elbo': []}
         current_best_score = -float_inf
@@ -165,7 +166,8 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
         val_sampling_size = kwargs.get('validation_sampling_size', 10)
         checkpoint_callback = kwargs.get('checkpoint_callback', None)
 
-        data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training')
+        data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training',
+                                                                   shuffle=True, grouping_mode='by_pairs')
 
         history = {'conjoint_vae_loss': [], 'elbo': []}
         current_best_score = -float_inf

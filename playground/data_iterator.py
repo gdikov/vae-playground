@@ -32,10 +32,8 @@ class DataIterator(object):
                            "and it will be automatically augmented with {} more samples.".format(additional_samples))
             additional_samples_indices = np.random.choice(data_size, size=additional_samples)
             if isinstance(data, dict):
-                altered_data = {'data': np.concatenate([data['data'],
-                                                        data['data'][additional_samples_indices]], axis=0),
-                                'target': np.concatenate([data['target'],
-                                                          data['target'][additional_samples_indices]], axis=0)}
+                altered_data = {key: np.concatenate([data[key], data[key][additional_samples_indices]], axis=0)
+                                for key in data.keys()}
             else:
                 altered_data = np.concatenate([data, data[additional_samples_indices]], axis=0)
         else:
@@ -104,9 +102,10 @@ class ConjointAVBDataIterator(DataIterator):
         super(ConjointAVBDataIterator, self).__init__(seed=seed, data_dim=data_dim, latent_dim=latent_dim)
 
     def iter_data_training(self, data, n_batches, **kwargs):
-        group_by_target = kwargs.get('group_by_target', True)
         shuffle = kwargs.get('shuffle', True)
         unique_labels = np.unique(data[0]['target'])
+        mode = kwargs.get('grouping_mode', 'by_pairs')
+
         if not (all([len(d['data']) == len(d['target']) for d in data])
                 and all([len(d['data']) == len(data[0]['data']) for d in data[1:]])
                 and np.all([np.unique(d['target']) == unique_labels for d in data[1:]])):
@@ -115,12 +114,33 @@ class ConjointAVBDataIterator(DataIterator):
         data_size = len(data[0]['data'])
         batch_size = data_size // n_batches
 
-        if group_by_target:
+        def pairwise_iter():
+            while True:
+                for i in range(n_batches):
+                    if shuffle:
+                        # shuffling is only pair-id-wise
+                        sample_ids = np.random.choice(data_size, size=batch_size)
+                    else:
+                        if n_batches * batch_size < data_size and i == n_batches - 1:
+                            # shouldn't happen to do this because of the size augmentation beforehand
+                            # nevertheless keep this safety code here.
+                            sample_ids = np.concatenate([np.arange(i * batch_size, data_size),
+                                                         np.arange(0, data_size - batch_size * n_batches)])
+                        else:
+                            sample_ids = np.arange(i * batch_size, (i + 1) * batch_size)
+                    batch = [d['data'][sample_ids].astype(np.float32) for d in data]
+                    yield batch
+
+        def targetwise_iter(key):
+            if not shuffle:
+                logger.warning("Iteration with grouping by target will enable shuffling within a group. Only groups are"
+                               "iterated in a sequential order. If this is your intention, ignore this warning, "
+                               "otherwise you might want to run it with `group_mode='by_pairs'` instead.")
             indices_groups = []
             for d in data:
                 # group the targets of each dataset by label
-                sorted_indices = np.argsort(d['target'])
-                sorted_labels = d['target'][sorted_indices]
+                sorted_indices = np.argsort(d[key])
+                sorted_labels = d[key][sorted_indices]
                 first_uniques = np.concatenate(([True], sorted_labels[1:] != sorted_labels[:-1]))
                 count_uniques = np.diff(np.nonzero(first_uniques)[0])
                 indices_groups.append(np.split(sorted_indices, np.cumsum(count_uniques)))
@@ -128,18 +148,38 @@ class ConjointAVBDataIterator(DataIterator):
                 for i in range(n_batches):
                     if shuffle:
                         # sample batch_size many samples from each dataset such that the labels are the same
+                        # however, samples may have different labels within the batch.
                         random_groups = np.random.randint(low=0, high=unique_labels.size, size=batch_size)
                         sample_ids = np.squeeze([[np.random.choice(dataset_groups[random_group_id], size=1)
-                                                 for dataset_groups in indices_groups]
+                                                  for dataset_groups in indices_groups]
                                                  for random_group_id in random_groups]).T
                     else:
+                        # here all samples have the same label (target) but are randomly sampled within the group.
                         group_id = int(i / (n_batches / len(unique_labels)))
-                        sample_ids = np.squeeze([np.random.choice(dataset_groups[group_id], size=batch_size)
-                                                 for dataset_groups in indices_groups])
+                        if np.all([indices_groups[0][group_id].size == dataset_groups[group_id].size
+                                   for dataset_groups in indices_groups[1:]]):
+                            random_samples_from_group = np.random.choice(indices_groups[0][group_id].size,
+                                                                         size=batch_size)
+                            sample_ids = np.squeeze([dataset_groups[group_id][random_samples_from_group]
+                                                     for dataset_groups in indices_groups])
+                        else:
+                            # the data groups are unequally sized so some samples in the larger dataset will be missed
+                            smaller_group = np.asscalar(np.argmin([dataset_groups[group_id].size
+                                                                   for dataset_groups in indices_groups]))
+                            random_samples_from_group = np.random.choice(indices_groups[smaller_group][group_id],
+                                                                         size=batch_size)
+                            sample_ids = [random_samples_from_group] * len(indices_groups)
                     batch = [data[j]['data'][ids].astype(np.float32) for j, ids in enumerate(sample_ids)]
                     yield batch
+
+        if mode == 'by_pairs':
+            batch_gen = pairwise_iter()
+        elif mode == 'by_targets':
+            batch_gen = targetwise_iter(key='target')
         else:
-            raise NotImplementedError
+            raise ValueError('Grouping mode can only be `by_pairs` or `by_targets`.')
+        while True:
+            yield next(batch_gen)
 
     def iter_data_inference(self, data, n_batches, **kwargs):
         group_by_target = kwargs.get('group_by_target', False)
