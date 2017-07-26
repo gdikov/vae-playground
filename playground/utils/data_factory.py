@@ -63,8 +63,8 @@ class PatternFactory(object):
             assert shape[0] / 2 / height > 0 and shape[1] / 2 / width > 0, "Invalid shape and block width/height."
             # checkerboard style:
             repeats = int(np.ceil(shape[1] / 2 / width))
-            row_1 = np.array([[1]*width, [0]*width]*repeats).ravel()[None, :]
-            row_2 = np.array([[0]*width, [1]*width]*repeats).ravel()[None, :]
+            row_1 = np.array([[1] * width, [0] * width] * repeats).ravel()[None, :]
+            row_2 = np.array([[0] * width, [1] * width] * repeats).ravel()[None, :]
             two_rows = np.repeat(np.vstack([row_1, row_2]), height, axis=0)
             pattern = np.tile(two_rows.T, int(np.ceil(shape[0] / 2 / height)))
             tag = 'strippy_checker'
@@ -114,6 +114,7 @@ class CustomMNIST(object):
     """
     Factory for customized MNIST digits. Background will have different structure/style.
     """
+
     def __init__(self):
         self.data = load_mnist(one_hot=False, binarised=False, rotated=False, background=None, large_set=True)
         self.unique_labels = np.arange(10)
@@ -162,14 +163,6 @@ class CustomMNIST(object):
             A tuple of a dict with `data`, `target` and `style` keys and a verbal descriptions of the style encoding.
         """
 
-        def compose_new(new_background, old_sample):
-            assert new_background.ravel().shape == old_sample.shape
-            old_sample = old_sample.reshape(new_background.shape)
-            mask_digit = old_sample > 0
-            new_sample = old_sample.copy()
-            new_sample[~mask_digit] = new_background[~mask_digit]
-            return new_sample
-
         augmented_data = {'data': [], 'target': [], 'tag': []}
         if style_distribution is None:
             style_distribution = np.ones(self.styles.size) / self.styles.size
@@ -182,12 +175,21 @@ class CustomMNIST(object):
         for s_id, l_id in zip(s_ids, l_ids):
             new_sample_background = self._generate_style(style=s_id, **kwargs)
             random_id = np.random.choice(len(self.grouped_data[l_id]))
-            newly_composed_digit = compose_new(new_sample_background['image'], self.grouped_data[l_id][random_id])
+            newly_composed_digit = self._compose_new(new_sample_background['image'], self.grouped_data[l_id][random_id])
             augmented_data['data'].append(newly_composed_digit)
             augmented_data['target'].append(l_id)
             augmented_data['tag'].append(new_sample_background['tag'])
 
         return augmented_data
+
+    @staticmethod
+    def _compose_new(new_background, old_sample):
+        assert new_background.ravel().shape == old_sample.shape
+        old_sample = old_sample.reshape(new_background.shape)
+        mask_digit = old_sample > 0
+        new_sample = old_sample.copy()
+        new_sample[~mask_digit] = new_background[~mask_digit]
+        return new_sample
 
     @staticmethod
     def save_dataset(new_data, tag):
