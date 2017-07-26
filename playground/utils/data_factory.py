@@ -43,6 +43,8 @@ class PatternFactory(object):
     def render_strippy(shape, orientation='horizontal', width=1, height=1, as_gray=False):
         if not as_gray:
             raise NotImplementedError
+        if orientation == 'vertical_or_horizontal':
+            orientation = np.random.choice(['horizontal', 'vertical'])
         if orientation == 'random':
             orientation = np.random.choice(['horizontal', 'vertical', 'checker'])
         if orientation == 'horizontal':
@@ -179,7 +181,7 @@ class CustomMNIST(object):
 
         return augmented_data
 
-    def augment(self, style_distribution=None):
+    def augment(self, style_distribution=None,**kwargs):
         """
         Generate backgrounds for MNIST images, without changing their order
         
@@ -196,7 +198,7 @@ class CustomMNIST(object):
         s_ids = np.random.choice(self.styles.size, size=data_size, replace=True, p=style_distribution)
         for id in range(data_size):
             s_id = s_ids[id]
-            new_sample_background = self._generate_style(style=s_id)
+            new_sample_background = self._generate_style(style=s_id,**kwargs)
             newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
             augmented_data['data'].append(newly_composed_digit)
             augmented_data['target'].append(id)
