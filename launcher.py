@@ -137,7 +137,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=10, epochs=1,
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
                                      save_interrupted=True,
                                      validation_data=test_data,
                                      validation_frequency=20,
@@ -187,6 +187,4 @@ def run_mnist_experiment(model='avb', pretrained_model=None, two_backgrounds_per
 
 
 if __name__ == '__main__':
-    # Two backgrounds per encoder (strippy horizontal/vertical and trippy/mandelbrot)
-    # Datasets (N=50k) are created at 'data/MNIST_Custom_Variations' if they don't exist (may take a while)
     run_mnist_experiment(model='vae', two_backgrounds_per_encoder=True, color_tags=True, small_set=True)
