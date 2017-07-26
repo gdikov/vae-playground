@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from builtins import range, next
 
-from numpy import inf as float_inf
+from numpy import mean, inf as float_inf
 from tqdm import tqdm, trange
 from keras.optimizers import Adam
 
@@ -169,8 +169,8 @@ class AdversarialVariationalBayes(BaseVariationalAutoencoder):
                     loss_discriminator = self.avb_trainable_discriminator.train_on_batch(training_batch, None)
                     epoch_loss_history_disc.append(loss_discriminator)
 
-            history['encoder_decoder_loss'].append(epoch_loss_history_encdec)
-            history['discriminator_loss'].append(epoch_loss_history_disc)
+            history['encoder_decoder_loss'].append(mean(epoch_loss_history_encdec))
+            history['discriminator_loss'].append(mean(epoch_loss_history_disc))
 
             if val_data is not None and (ep + 1) % val_freq == 0:
                 elbo, kl_marginal, rec_err = self.evaluate(val_data, batch_size=batch_size,
@@ -309,7 +309,8 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
         val_sampling_size = kwargs.get('validation_sampling_size', 10)
         checkpoint_callback = kwargs.get('checkpoint_callback', None)
 
-        data_iterator, iters_per_epoch = self.data_iterator.iter(data, batch_size, mode='training', shuffle=True)
+        data_iterator, iters_per_epoch = self.data_iterator.iter(data, batch_size, mode='training',
+                                                                 shuffle=False, grouping_mode='by_pairs')
 
         history = {'encoder_decoder_loss': [], 'discriminator_loss': [], 'elbo': []}
         current_best_score = -float_inf
@@ -324,8 +325,8 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
                     loss_discriminator = self.avb_trainable_discriminator.train_on_batch(training_batch, None)
                     epoch_loss_history_disc.append(loss_discriminator)
 
-            history['encoder_decoder_loss'].append(epoch_loss_history_encdec)
-            history['discriminator_loss'].append(epoch_loss_history_disc)
+            history['encoder_decoder_loss'].append(mean(epoch_loss_history_encdec))
+            history['discriminator_loss'].append(mean(epoch_loss_history_disc))
 
             if val_data is not None and (ep + 1) % val_freq == 0:
                 elbo, kl_marginal, rec_err = self.evaluate(val_data, batch_size=batch_size,
