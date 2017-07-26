@@ -164,12 +164,9 @@ class CustomMNIST(object):
         """
 
         augmented_data = {'data': [], 'target': [], 'tag': []}
-        if style_distribution is None:
-            style_distribution = np.ones(self.styles.size) / self.styles.size
         if label_distribution is None:
             label_distribution = np.ones(self.unique_labels.size) / self.unique_labels.size
-        if isinstance(style_distribution, dict):
-            style_distribution = [style_distribution[s] if s in style_distribution.keys() else 0 for s in self.styles]
+        style_distribution = self._get_style_distro(style_distribution)
         s_ids = np.random.choice(self.styles.size, size=n_samples, replace=True, p=style_distribution)
         l_ids = np.random.choice(self.unique_labels.size, size=n_samples, replace=True, p=label_distribution)
         for s_id, l_id in zip(s_ids, l_ids):
@@ -181,6 +178,17 @@ class CustomMNIST(object):
             augmented_data['tag'].append(new_sample_background['tag'])
 
         return augmented_data
+
+    def augment(self, style_distribution=None, **kwargs):
+        raise NotImplementedError
+
+    # TODO: style_distribiution = None does not work at the moment. Style 3 not implemented
+    def _get_style_distro(self, style_distribution):
+        if style_distribution is None:
+            style_distribution = np.ones(self.styles.size) / self.styles.size
+        if isinstance(style_distribution, dict):
+            style_distribution = [style_distribution[s] if s in style_distribution.keys() else 0 for s in self.styles]
+        return style_distribution
 
     @staticmethod
     def _compose_new(new_background, old_sample):
