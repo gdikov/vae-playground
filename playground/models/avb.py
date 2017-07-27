@@ -310,7 +310,7 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
         checkpoint_callback = kwargs.get('checkpoint_callback', None)
 
         data_iterator, iters_per_epoch = self.data_iterator.iter(data, batch_size, mode='training',
-                                                                 shuffle=False, grouping_mode='by_pairs')
+                                                                 shuffle=True, grouping_mode='by_targets')
 
         history = {'encoder_decoder_loss': [], 'discriminator_loss': [], 'elbo': []}
         current_best_score = -float_inf
@@ -319,6 +319,7 @@ class ConjointAdversarialVariationalBayes(BaseVariationalAutoencoder):
             epoch_loss_history_disc = []
             for it in range(iters_per_epoch):
                 training_batch = next(data_iterator)
+                # print(training_batch[0] == training_batch[1])
                 loss_autoencoder = self.avb_trainable_encoder_decoder.train_on_batch(training_batch, None)
                 epoch_loss_history_encdec.append(loss_autoencoder)
                 for _ in range(discriminator_repetitions):
