@@ -165,9 +165,10 @@ class ConjointGaussianVariationalAutoencoder(BaseVariationalAutoencoder):
         val_freq = kwargs.get('validation_frequency', 10)
         val_sampling_size = kwargs.get('validation_sampling_size', 10)
         checkpoint_callback = kwargs.get('checkpoint_callback', None)
+        iter_grouping_mode = kwargs.get('grouping_mode', 'by_targets')
 
         data_iterator, batches_per_epoch = self.data_iterator.iter(data, batch_size, mode='training',
-                                                                   shuffle=True, grouping_mode='by_targets')
+                                                                   shuffle=True, grouping_mode=iter_grouping_mode)
 
         history = {'conjoint_vae_loss': [], 'elbo': []}
         current_best_score = -float_inf

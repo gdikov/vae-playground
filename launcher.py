@@ -40,7 +40,8 @@ def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='pro
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(data, batch_size=4, epochs=1000,
+    model_dir = trainer.run_training(data, batch_size=8, epochs=10000,
+                                     grouping_mode='by_targets',
                                      save_interrupted=True,
                                      validation_data=data,
                                      validation_frequency=500,
@@ -111,6 +112,7 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
     model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
+                                     grouping_mode='by_pairs',
                                      save_interrupted=True,
                                      validation_data=test_data,
                                      validation_frequency=20,
