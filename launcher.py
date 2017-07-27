@@ -172,7 +172,7 @@ def run_usps_mnist_experiment(model='avb', pretrained_model=None):
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
+    model_dir = trainer.run_training(train_data, batch_size=100, epochs=100,
                                      save_interrupted=True,
                                      validation_data=test_data,
                                      validation_frequency=20,
@@ -193,16 +193,16 @@ def run_usps_mnist_experiment(model='avb', pretrained_model=None):
         plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(train_data[0]['target'], sampling_size),
                        fig_dirpath=model_dir, fig_name='private_{}'.format(i))
 
-    reconstructions = trained_model.reconstruct(test_data, batch_size=100, sampling_size=1)
-    save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
-    for i, rec in enumerate(reconstructions):
-        plot_reconstructed_data(test_data[i]['data'], rec,
-                                fig_dirpath=model_dir, fig_name='reconstructed_{}'.format(i))
-
-    generations = trained_model.generate(n_samples=100, batch_size=100)
-    save_array(path_join(model_dir, 'generated_samples.npy'), generations)
-    for i, gen in enumerate(generations):
-        plot_sampled_data(gen, fig_dirpath=model_dir, fig_name='data_{}'.format(i))
+    # reconstructions = trained_model.reconstruct(test_data, batch_size=100, sampling_size=1)
+    # save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
+    # for i, rec in enumerate(reconstructions):
+    #    plot_reconstructed_data(test_data[i]['data'], rec,
+    #                            fig_dirpath=model_dir, fig_name='reconstructed_{}'.format(i))
+    #
+    # generations = trained_model.generate(n_samples=100, batch_size=100)
+    # save_array(path_join(model_dir, 'generated_samples.npy'), generations)
+    # for i, gen in enumerate(generations):
+    #     plot_sampled_data(gen, fig_dirpath=model_dir, fig_name='data_{}'.format(i))
 
     clear_session()
     return model_dir
