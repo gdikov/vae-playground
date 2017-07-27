@@ -30,7 +30,7 @@ def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='pro
                                           use_adaptive_contrast=False,
                                           optimiser_params={'encdec': {'lr': 1e-3, 'beta_1': 0.5},
                                                             'disc': {'lr': 1e-3, 'beta_1': 0.5}},
-                                          schedule={'iter_disc': 1, 'iter_encdec': 1},
+                                          schedule={'iter_disc': 3, 'iter_encdec': 1},
                                           overwrite=True,
                                           save_best=True,
                                           pretrained_dir=pretrained_model,
@@ -43,7 +43,7 @@ def run_synthetic_experiment(model='avb', pretrained_model=None, noise_mode='pro
     model_dir = trainer.run_training(data, batch_size=4, epochs=1000,
                                      save_interrupted=True,
                                      validation_data=data,
-                                     validation_frequency=5,
+                                     validation_frequency=500,
                                      validation_sampling_size=5)
     # model_dir = './output/tmp'
     trained_model = trainer.get_model()
@@ -147,5 +147,5 @@ def run_mnist_experiment(model='avb', pretrained_model=None):
 
 
 if __name__ == '__main__':
-    # run_synthetic_experiment(model='avb', noise_mode='product')
-    run_mnist_experiment(model='avb')
+    run_synthetic_experiment(model='avb', noise_mode='product')
+    # run_mnist_experiment(model='avb')
