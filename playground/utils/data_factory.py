@@ -43,6 +43,8 @@ class PatternFactory(object):
     def render_strippy(shape, orientation='horizontal', width=1, height=1, as_gray=False):
         if not as_gray:
             raise NotImplementedError
+        if orientation == 'vertical_or_horizontal':
+            orientation = np.random.choice(['horizontal', 'vertical'])
         if orientation == 'random':
             orientation = np.random.choice(['horizontal', 'vertical', 'checker'])
         if orientation == 'horizontal':
@@ -63,8 +65,8 @@ class PatternFactory(object):
             assert shape[0] / 2 / height > 0 and shape[1] / 2 / width > 0, "Invalid shape and block width/height."
             # checkerboard style:
             repeats = int(np.ceil(shape[1] / 2 / width))
-            row_1 = np.array([[1]*width, [0]*width]*repeats).ravel()[None, :]
-            row_2 = np.array([[0]*width, [1]*width]*repeats).ravel()[None, :]
+            row_1 = np.array([[1] * width, [0] * width] * repeats).ravel()[None, :]
+            row_2 = np.array([[0] * width, [1] * width] * repeats).ravel()[None, :]
             two_rows = np.repeat(np.vstack([row_1, row_2]), height, axis=0)
             pattern = np.tile(two_rows.T, int(np.ceil(shape[0] / 2 / height)))
             tag = 'strippy_checker'
@@ -114,8 +116,9 @@ class CustomMNIST(object):
     """
     Factory for customized MNIST digits. Background will have different structure/style.
     """
-    def __init__(self):
-        self.data = load_mnist(one_hot=False, binarised=False, rotated=False, background=None, large_set=True)
+
+    def __init__(self, smallset=False):
+        self.data = load_mnist(one_hot=False, binarised=False, rotated=False, background=None, large_set=(not smallset))
         self.unique_labels = np.arange(10)
         # group the targets of each dataset by label
         sorted_indices = np.argsort(self.data['target'])
@@ -162,36 +165,72 @@ class CustomMNIST(object):
             A tuple of a dict with `data`, `target` and `style` keys and a verbal descriptions of the style encoding.
         """
 
-        def compose_new(new_background, old_sample):
-            assert new_background.ravel().shape == old_sample.shape
-            old_sample = old_sample.reshape(new_background.shape)
-            mask_digit = old_sample > 0
-            new_sample = old_sample.copy()
-            new_sample[~mask_digit] = new_background[~mask_digit]
-            return new_sample
-
         augmented_data = {'data': [], 'target': [], 'tag': []}
-        if style_distribution is None:
-            style_distribution = np.ones(self.styles.size) / self.styles.size
         if label_distribution is None:
             label_distribution = np.ones(self.unique_labels.size) / self.unique_labels.size
-        if isinstance(style_distribution, dict):
-            style_distribution = [style_distribution[s] if s in style_distribution.keys() else 0 for s in self.styles]
+        style_distribution = self._get_style_distro(style_distribution)
         s_ids = np.random.choice(self.styles.size, size=n_samples, replace=True, p=style_distribution)
         l_ids = np.random.choice(self.unique_labels.size, size=n_samples, replace=True, p=label_distribution)
         for s_id, l_id in zip(s_ids, l_ids):
             new_sample_background = self._generate_style(style=s_id, **kwargs)
             random_id = np.random.choice(len(self.grouped_data[l_id]))
-            newly_composed_digit = compose_new(new_sample_background['image'], self.grouped_data[l_id][random_id])
+            newly_composed_digit = self._compose_new(new_sample_background['image'], self.grouped_data[l_id][random_id])
             augmented_data['data'].append(newly_composed_digit)
             augmented_data['target'].append(l_id)
             augmented_data['tag'].append(new_sample_background['tag'])
 
         return augmented_data
 
+    def augment(self, style_distribution=None, no_mandelbrot=False, **kwargs):
+        """
+        Generate backgrounds for MNIST images, without changing their order
+        
+        Args:
+            style_distribution: list, array of percentage generations for each style (uniform if None)
+
+        Returns:
+            A tuple of a dict with `data`, `target` and `style` keys and a verbal descriptions of the style encoding.
+        """
+
+        augmented_data = {'data': [], 'target': [], 'tag': []}
+        style_distribution = self._get_style_distro(style_distribution)
+        data_size = self.data['target'].shape[0]
+        s_ids = np.random.choice(self.styles.size, size=data_size, replace=True, p=style_distribution)
+        for id in range(data_size):
+            s_id = s_ids[id]
+            # Mandelbrot rendering takes forever and background is just black. Skip those
+            if s_id == 2 and no_mandelbrot:
+                newly_composed_digit = np.reshape(self.data['data'][id],(28,28))
+                new_sample_background = {'tag': 'black'}
+            else:
+                new_sample_background = self._generate_style(style=s_id, **kwargs)
+                newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
+            augmented_data['data'].append(newly_composed_digit)
+            augmented_data['target'].append(self.data['target'][id])
+            augmented_data['tag'].append(new_sample_background['tag'])
+
+        return augmented_data
+
+    # TODO: style_distribiution = None does not work at the moment. Style 3 not implemented
+    def _get_style_distro(self, style_distribution):
+        if style_distribution is None:
+            style_distribution = np.ones(self.styles.size) / self.styles.size
+        if isinstance(style_distribution, dict):
+            style_distribution = [style_distribution[s] if s in style_distribution.keys() else 0 for s in self.styles]
+        return style_distribution
+
+    @staticmethod
+    def _compose_new(new_background, old_sample):
+        assert new_background.ravel().shape == old_sample.shape
+        old_sample = old_sample.reshape(new_background.shape)
+        mask_digit = old_sample > 0
+        new_sample = old_sample.copy()
+        new_sample[~mask_digit] = new_background[~mask_digit]
+        return new_sample
+
     @staticmethod
     def save_dataset(new_data, tag):
-        assert isinstance(new_data, dict), "Provida a dict data containing at least the keys `data` and `target`."
+        assert isinstance(new_data, dict), "Provide a dict data containing at least the keys `data` and `target`."
         new_data_path = os.path.join(DATA_DIR, 'MNIST_Custom_Variations')
         if not os.path.exists(new_data_path):
             os.makedirs(new_data_path)
