@@ -24,7 +24,7 @@ np.random.seed(config['seed'])
 
 class PatternFactory(object):
     def __init__(self):
-        self.styles = np.array(('trippy', 'strippy', 'mandelbrot', 'image'))
+        self.styles = np.array(('trippy', 'strippy', 'mandelbrot', 'black', 'image'))
 
     @staticmethod
     def render_trippy(shape, as_gray=False):
@@ -102,6 +102,14 @@ class PatternFactory(object):
         return {'image': pattern, 'tag': tag}
 
     @staticmethod
+    def render_black(shape, as_gray=False):
+        if as_gray:
+            pattern = np.zeros(shape)
+        else:
+            pattern = np.zeros((3,) + shape)
+        return {'image': pattern, 'tag': 'black'}
+
+    @staticmethod
     def render_image(shape, image_filename, as_gray=False):
         pattern = imread(os.path.join(TEXTURES_DIR, image_filename), as_grey=as_gray)
         pattern = resize(pattern, shape, order=3)
@@ -117,8 +125,9 @@ class CustomMNIST(object):
     Factory for customized MNIST digits. Background will have different structure/style.
     """
 
-    def __init__(self, smallset=False):
-        self.data = load_mnist(one_hot=False, binarised=False, rotated=False, background=None, large_set=(not smallset))
+    def __init__(self):
+        self.data = load_mnist(one_hot=False, binarised=False, rotated=False,
+                               background=None, large_set=True)
         self.unique_labels = np.arange(10)
         # group the targets of each dataset by label
         sorted_indices = np.argsort(self.data['target'])
@@ -147,6 +156,9 @@ class CustomMNIST(object):
             background = self.pattern_generator.render_mandelbrot((28, 28), as_gray=as_gray)
             self.cache[style] = background
         elif style == 3:
+            background = self.pattern_generator.render_black((28, 28), as_gray=as_gray)
+            self.cache[style] = background
+        elif style == 4:
             raise NotImplementedError
         else:
             raise ValueError("Unknown style id")
@@ -174,14 +186,15 @@ class CustomMNIST(object):
         for s_id, l_id in zip(s_ids, l_ids):
             new_sample_background = self._generate_style(style=s_id, **kwargs)
             random_id = np.random.choice(len(self.grouped_data[l_id]))
-            newly_composed_digit = self._compose_new(new_sample_background['image'], self.grouped_data[l_id][random_id])
+            newly_composed_digit = self._compose_new(new_sample_background['image'],
+                                                     self.grouped_data[l_id][random_id])
             augmented_data['data'].append(newly_composed_digit)
             augmented_data['target'].append(l_id)
             augmented_data['tag'].append(new_sample_background['tag'])
 
         return augmented_data
 
-    def augment(self, style_distribution=None, no_mandelbrot=False, **kwargs):
+    def augment(self, style_distribution=None, **kwargs):
         """
         Generate backgrounds for MNIST images, without changing their order
         
@@ -198,13 +211,10 @@ class CustomMNIST(object):
         s_ids = np.random.choice(self.styles.size, size=data_size, replace=True, p=style_distribution)
         for id in range(data_size):
             s_id = s_ids[id]
-            # Mandelbrot rendering takes forever and background is just black. Skip those
-            if s_id == 2 and no_mandelbrot:
-                newly_composed_digit = np.reshape(self.data['data'][id],(28,28))
-                new_sample_background = {'tag': 'black'}
-            else:
-                new_sample_background = self._generate_style(style=s_id, **kwargs)
-                newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
+
+            new_sample_background = self._generate_style(style=s_id, **kwargs)
+            newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
+
             augmented_data['data'].append(newly_composed_digit)
             augmented_data['target'].append(self.data['target'][id])
             augmented_data['tag'].append(new_sample_background['tag'])
