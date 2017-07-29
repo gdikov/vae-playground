@@ -1,11 +1,11 @@
 from __future__ import division
 
 from numpy import save as save_array
-from os.path import join as path_join, exists as path_exists
-from numpy import repeat, zeros
+from os.path import join as path_join
+from numpy import repeat
 from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
-from playground.utils.datasets import load_conjoint_synthetic, load_mnist, join_datasets
+from playground.utils.datasets import load_conjoint_synthetic, load_mnist
 from playground.utils.data_factory import CustomMNIST
 from playground.utils.logger import logger
 from keras.backend import clear_session
@@ -71,8 +71,12 @@ def synthetic(model='avb', pretrained_model=None, noise_mode='product'):
 
 
 def mnist_variations(n_datasets=1, model='avb', pretrained_model=None):
-    return {1: mnist_variations_one(model=model, pretrained_model=pretrained_model),
-            2: mnist_variations_two(model=model, pretrained_model=pretrained_model)}[n_datasets]
+    if n_datasets == 1:
+        mnist_variations_one(model=model, pretrained_model=pretrained_model)
+    elif n_datasets == 2:
+        mnist_variations_two(model=model, pretrained_model=pretrained_model)
+    else:
+        raise NotImplementedError("Currently only 1 and 2 number of datasets per encoder are implemented.")
 
 
 def mnist_variations_one(model='avb', pretrained_model=None):
@@ -153,17 +157,8 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
     cmnist = CustomMNIST()
     data = []
     for dataset in datasets:
-        dataset_path = path_join('data', 'MNIST_Custom_Variations', '_'.join(dataset) + '.npz')
-        if not path_exists(dataset_path):
-            styles = {k: v for k, v in enumerate(cmnist.pattern_generator.get_styles())}
-            style_dist = zeros(len(list(styles.keys())))
-            custom_data = []
-            for s in dataset:
-                style_dist[styles[s]] = 1 / len(dataset)
-                custom_data.append(cmnist.augment(style_distribution=style_dist))
-            custom_data = join_datasets(custom_data, shuffle=True)
-            cmnist.save_dataset(custom_data, dataset_path)
-        data.append(load_mnist(local_data_path=dataset_path, one_hot=False, binarised=False, background='custom'))
+        custom_data = cmnist.load_dataset('_'.join(dataset), generate_if_none=True)
+        data.append(custom_data)
     train_data = tuple([{k: d[k][:-100] for k in d.keys()} for d in data])
     test_data = tuple([{k: d[k][-100:] for k in d.keys()} for d in data])
 

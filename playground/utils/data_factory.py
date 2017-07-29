@@ -24,7 +24,8 @@ np.random.seed(config['seed'])
 
 class PatternFactory(object):
     def __init__(self):
-        self.styles = np.array(('trippy', 'strippy', 'mandelbrot', 'black', 'image'))
+        self.styles = np.array(('trippy', 'horizontal', 'vertical', 'checkerboard',
+                                'mandelbrot', 'black', 'image'))
 
     @staticmethod
     def render_trippy(shape, as_gray=False):
@@ -52,14 +53,14 @@ class PatternFactory(object):
             repeats_to_fit = int(np.ceil(shape[0] / 2 / height))
             col = np.array([[1] * height, [0] * height] * repeats_to_fit).ravel()[None, :]
             pattern = np.repeat(col, shape[1], axis=0).T
-            tag = 'strippy_horizontal'
+            tag = 'horizontal'
         elif orientation == 'vertical':
             repeats_to_fit = int(np.ceil(shape[1] / 2 / width))
             row = np.array([[1] * width, [0] * width] * repeats_to_fit).ravel()[None, :]
             pattern = np.repeat(row, shape[0], axis=0)
-            tag = 'strippy_vertical'
+            tag = 'vertical'
         elif orientation == 'diagonal':
-            tag = 'strippy_diagonal'
+            tag = 'diagonal'
             raise NotImplementedError
         elif orientation == 'checker':
             assert shape[0] / 2 / height > 0 and shape[1] / 2 / width > 0, "Invalid shape and block width/height."
@@ -69,7 +70,7 @@ class PatternFactory(object):
             row_2 = np.array([[0] * width, [1] * width] * repeats).ravel()[None, :]
             two_rows = np.repeat(np.vstack([row_1, row_2]), height, axis=0)
             pattern = np.tile(two_rows.T, int(np.ceil(shape[0] / 2 / height)))
-            tag = 'strippy_checker'
+            tag = 'checker'
         else:
             raise ValueError("Unknown orientation")
 
@@ -145,21 +146,28 @@ class CustomMNIST(object):
         as_gray = kwargs.get('as_gray', True)
         if style in self.cache.keys():
             return self.cache[style]
-        if style == 0:
+        if style == 'trippy':
             background = self.pattern_generator.render_trippy((28, 28), as_gray=as_gray)
             self.cache[style] = background
-        elif style == 1:
+        elif style == 'strippy':
             orientation = kwargs.get('orientation', 'random')
             background = self.pattern_generator.render_strippy((28, 28), orientation=orientation, as_gray=as_gray)
-            # it can be randomized so cache is difficult. skip it. it is fast enough.
-        elif style == 2:
+            self.cache[style] = background
+        elif style == 'horizontal':
+            background = self.pattern_generator.render_strippy((28, 28), orientation='horizontal', as_gray=as_gray)
+            self.cache[style] = background
+        elif style == 'vertical':
+            background = self.pattern_generator.render_strippy((28, 28), orientation='vertical', as_gray=as_gray)
+            self.cache[style] = background
+        elif style == 'checkerboard':
+            background = self.pattern_generator.render_strippy((28, 28), orientation='checkerboard', as_gray=as_gray)
+            self.cache[style] = background
+        elif style == 'mandelbrot':
             background = self.pattern_generator.render_mandelbrot((28, 28), as_gray=as_gray)
             self.cache[style] = background
-        elif style == 3:
+        elif style == 'black':
             background = self.pattern_generator.render_black((28, 28), as_gray=as_gray)
             self.cache[style] = background
-        elif style == 4:
-            raise NotImplementedError
         else:
             raise ValueError("Unknown style id")
         return background
@@ -177,24 +185,27 @@ class CustomMNIST(object):
             A tuple of a dict with `data`, `target` and `style` keys and a verbal descriptions of the style encoding.
         """
 
-        augmented_data = {'data': [], 'target': [], 'tag': []}
+        generated_data = {'data': [], 'target': [], 'tag': []}
         if label_distribution is None:
             label_distribution = np.ones(self.unique_labels.size) / self.unique_labels.size
-        style_distribution = self._get_style_distro(style_distribution)
-        s_ids = np.random.choice(self.styles.size, size=n_samples, replace=True, p=style_distribution)
+        if style_distribution is None:
+            style_distribution = np.ones(self.styles.size) / self.styles.size
+        s_ids = np.random.choice(self.styles, size=n_samples, replace=True, p=style_distribution)
         l_ids = np.random.choice(self.unique_labels.size, size=n_samples, replace=True, p=label_distribution)
         for s_id, l_id in zip(s_ids, l_ids):
             new_sample_background = self._generate_style(style=s_id, **kwargs)
             random_id = np.random.choice(len(self.grouped_data[l_id]))
             newly_composed_digit = self._compose_new(new_sample_background['image'],
                                                      self.grouped_data[l_id][random_id])
-            augmented_data['data'].append(newly_composed_digit)
-            augmented_data['target'].append(l_id)
-            augmented_data['tag'].append(new_sample_background['tag'])
+            generated_data['data'].append(newly_composed_digit)
+            generated_data['target'].append(l_id)
+            generated_data['tag'].append(new_sample_background['tag'])
+        generated_data['data'] = np.asarray(generated_data['data'])
+        generated_data['target'] = np.asarray(generated_data['target'])
+        generated_data['tag'] = np.asarray(generated_data['tag'])
+        return generated_data
 
-        return augmented_data
-
-    def augment(self, style_distribution=None, **kwargs):
+    def augment(self, style_distribution, **kwargs):
         """
         Generate backgrounds for MNIST images, without changing their order
         
@@ -206,28 +217,21 @@ class CustomMNIST(object):
         """
 
         augmented_data = {'data': [], 'target': [], 'tag': []}
-        style_distribution = self._get_style_distro(style_distribution)
         data_size = self.data['target'].shape[0]
-        s_ids = np.random.choice(self.styles.size, size=data_size, replace=True, p=style_distribution)
-        for id in range(data_size):
-            s_id = s_ids[id]
-
+        s_ids = np.random.choice(self.styles, size=data_size, replace=True, p=style_distribution)
+        classes, counts = np.unique(s_ids, return_counts=True)
+        logger.info("Augmenting MNIST dataset with background classes {} (distribution: {})".format(classes, counts))
+        for id_ in range(data_size):
+            s_id = s_ids[id_]
             new_sample_background = self._generate_style(style=s_id, **kwargs)
-            newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id])
-
+            newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id_])
             augmented_data['data'].append(newly_composed_digit)
-            augmented_data['target'].append(self.data['target'][id])
+            augmented_data['target'].append(self.data['target'][id_])
             augmented_data['tag'].append(new_sample_background['tag'])
-
+        augmented_data['data'] = np.asarray(augmented_data['data'])
+        augmented_data['target'] = np.asarray(augmented_data['target'])
+        augmented_data['tag'] = np.asarray(augmented_data['tag'])
         return augmented_data
-
-    # TODO: style_distribiution = None does not work at the moment. Style 3 not implemented
-    def _get_style_distro(self, style_distribution):
-        if style_distribution is None:
-            style_distribution = np.ones(self.styles.size) / self.styles.size
-        if isinstance(style_distribution, dict):
-            style_distribution = [style_distribution[s] if s in style_distribution.keys() else 0 for s in self.styles]
-        return style_distribution
 
     @staticmethod
     def _compose_new(new_background, old_sample):
@@ -244,6 +248,34 @@ class CustomMNIST(object):
         new_data_path = os.path.join(DATA_DIR, 'MNIST_Custom_Variations')
         if not os.path.exists(new_data_path):
             os.makedirs(new_data_path)
+        if not new_data['data'].shape[-1] == 28**2:
+            new_data['data'] = new_data['data'].reshape(-1, 28**2)
+            logger.debug("Implicit reshape to {}".format(new_data['data'].shape))
         np.savez(os.path.join(new_data_path, tag), **new_data)
         logger.info("Saved {} dataset at location: {}".format(tag, new_data_path))
         return new_data_path
+
+    def load_dataset(self, tag, generate_if_none=True, default_distribution=None):
+        if tag.endswith('.npz'):
+            dataset_composition = os.path.splitext(tag)[0].split('_')
+        else:
+            dataset_composition = tag.split('_')
+            tag += '.npz'
+        dataset_path = os.path.join(DATA_DIR, 'MNIST_Custom_Variations', tag)
+        if not os.path.exists(dataset_path):
+            if generate_if_none:
+                if default_distribution is None:
+                    styles = {k: v for v, k in enumerate(self.styles)}
+                    style_dist = np.zeros(len(list(styles.keys())))
+                    for s in dataset_composition:
+                        style_dist[styles[s]] = 1 / len(dataset_composition)
+                else:
+                    style_dist = default_distribution
+                custom_data = self.augment(style_distribution=style_dist)
+                self.save_dataset(custom_data, tag)
+                return custom_data
+            else:
+                raise FileNotFoundError("No dataset with tag {} was found. Enable "
+                                        "`generate_if_none` to build one.".format(tag))
+        else:
+            return np.load(dataset_path)
