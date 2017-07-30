@@ -89,12 +89,8 @@ class BaseVariationalAutoencoder(object):
                            'target': np.repeat(d['target'], sampling_size, axis=0)} for d in data])
         else:
             data = np.repeat(data, sampling_size, axis=0)
-        group_by_target = kwargs.get('group_by_target', False)
-        if group_by_target:
-            mode = 'training'
-        else:
-            mode = 'inference'
-        data_iterator, n_iters = self.data_iterator.iter(data, batch_size, mode=mode)
+
+        data_iterator, n_iters = self.data_iterator.iter(data, batch_size, mode='inference')
         latent_samples = []
         for i in range(n_iters):
             batch = next(data_iterator)
