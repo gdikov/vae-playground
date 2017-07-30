@@ -181,7 +181,7 @@ def run_usps_mnist_experiment(model='avb', pretrained_model=None):
     model_dir = trainer.run_training(train_data, batch_size=100, epochs=100,
                                      save_interrupted=True,
                                      validation_data=test_data,
-                                     validation_frequency=20,
+                                     validation_frequency=500,
                                      validation_sampling_size=5)
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()

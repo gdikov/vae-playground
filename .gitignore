@@ -39,3 +39,4 @@ scratch.py
 
 # local system files
 .DS_Store
+debug.py
