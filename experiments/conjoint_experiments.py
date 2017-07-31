@@ -162,9 +162,8 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
     for dataset in datasets:
         custom_data = cmnist.load_dataset('_'.join(dataset), generate_if_none=True)
         data.append(custom_data)
-    train_data = tuple([{k: d[k][:-100][:100] for k in d.keys()} for d in data])
-    # test_data = tuple([{k: d[k][-100:] for k in d.keys()} for d in data])
-    test_data = train_data
+    train_data = tuple([{k: d[k][:-100] for k in d.keys()} for d in data])
+    test_data = tuple([{k: d[k][-100:] for k in d.keys()} for d in data])
 
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
@@ -175,9 +174,10 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=64,
                                           use_adaptive_contrast=False,
-                                          optimiser_params={'encdec': {'lr': 1e-3, 'beta_1': 0.5},
-                                                            'disc': {'lr': 1e-3, 'beta_1': 0.5}},
-                                          schedule={'iter_disc': 1, 'iter_encdec': 1},
+                                          noise_mode='add',
+                                          optimiser_params={'encdec': {'lr': 0.001, 'beta_1': 0.5},
+                                                            'disc': {'lr': 0.001, 'beta_1': 0.5}},
+                                          schedule={'iter_disc': 3, 'iter_encdec': 1},
                                           overwrite=True, save_best=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='mnist',
@@ -187,9 +187,9 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
 
     model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
                                      save_interrupted=True,
-                                     grouping_mode='by_targets',
+                                     grouping_mode='by_pairs',
                                      validation_data=test_data,
-                                     validation_frequency=20,
+                                     validation_frequency=1,
                                      validation_sampling_size=5)
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
@@ -204,7 +204,7 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
     for i, lat_id in enumerate(latent_dims[:-1]):
         start_id = stop_id
         stop_id += lat_id
-        plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(train_data[0]['tag'], sampling_size),
+        plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(train_data[i]['tag'], sampling_size),
                        fig_dirpath=model_dir, fig_name='private_{}'.format(i))
 
     reconstructions = trained_model.reconstruct(test_data, batch_size=100, sampling_size=1)
