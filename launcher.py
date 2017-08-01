@@ -219,4 +219,4 @@ def run_usps_mnist_experiment(model='avb', pretrained_model=None):
 if __name__ == '__main__':
     # run_synthetic_experiment(model='avb', noise_mode='product', pretrained_model='output/conjoint_avb/synthetic/final')
     # run_mnist_experiment(model='avb')
-    run_usps_mnist_experiment(model='vae')
+    run_usps_mnist_experiment(model='avb')
