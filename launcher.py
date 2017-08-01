@@ -157,14 +157,14 @@ def run_usps_mnist_experiment(model='avb', pretrained_model=None):
     # cutting MNIST to make the number of datapoints match -- refactor to augment data instead later on
     train_data = ({'data': data_0['data'][:11000], 'target': data_0['target'][:11000]},
                   {'data': data_1['data'], 'target': data_1['target']})
-    test_data = ({'data': data_0['data'][:11000], 'target': data_0['target'][:11000]},
-                 {'data': data_1['data'], 'target': data_1['target']})
+    test_data = ({'data': data_0['data'][:1100], 'target': data_0['target'][:1100]},
+                 {'data': data_1['data'][:1100], 'target': data_1['target'][:1100]})
 
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
                                           experiment_name='usps_mnist', architecture='usps_mnist',
                                           overwrite=True, save_best=True,
-                                          optimiser_params={'lr': 0.0007, 'beta_1': 0.5},
+                                          optimiser_params={'lr': 8e-6, 'beta_1': 0.5},
                                           pretrained_dir=pretrained_model)
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=64,
@@ -180,8 +180,8 @@ def run_usps_mnist_experiment(model='avb', pretrained_model=None):
 
     model_dir = trainer.run_training(train_data, batch_size=100, epochs=100,
                                      save_interrupted=True,
-                                     validation_data=test_data,
-                                     validation_frequency=500,
+                                     validation_data=None,
+                                     validation_frequency=1,
                                      validation_sampling_size=5)
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
@@ -199,16 +199,18 @@ def run_usps_mnist_experiment(model='avb', pretrained_model=None):
         plot_latent_2d(latent_vars[:, start_id:stop_id], repeat(train_data[0]['target'], sampling_size),
                        fig_dirpath=model_dir, fig_name='private_{}'.format(i))
 
-    # reconstructions = trained_model.reconstruct(test_data, batch_size=100, sampling_size=1)
-    # save_array(path_join(model_dir, 'reconstructed_samples.npy'), reconstructions)
-    # for i, rec in enumerate(reconstructions):
-    #    plot_reconstructed_data(test_data[i]['data'], rec,
-    #                            fig_dirpath=model_dir, fig_name='reconstructed_{}'.format(i))
-    #
-    # generations = trained_model.generate(n_samples=100, batch_size=100)
-    # save_array(path_join(model_dir, 'generated_samples.npy'), generations)
-    # for i, gen in enumerate(generations):
-    #     plot_sampled_data(gen, fig_dirpath=model_dir, fig_name='data_{}'.format(i))
+    reconstructions = trained_model.reconstruct(test_data, batch_size=100, sampling_size=1)
+    save_array(path_join(model_dir, 'reconstructed_samples_mnist.npy'), reconstructions[0])
+    save_array(path_join(model_dir, 'reconstructed_samples_usps.npy'), reconstructions[1])
+    for i, rec in enumerate(reconstructions):
+       plot_reconstructed_data(test_data[i]['data'], rec,
+                               fig_dirpath=model_dir, fig_name='reconstructed_{}'.format(i))
+
+    generations = trained_model.generate(n_samples=100, batch_size=100)
+    save_array(path_join(model_dir, 'generated_samples_mnist.npy'), generations[0])
+    save_array(path_join(model_dir, 'generated_samples_usps.npy'), generations[1])
+    for i, gen in enumerate(generations):
+         plot_sampled_data(gen, fig_dirpath=model_dir, fig_name='data_{}'.format(i))
 
     clear_session()
     return model_dir

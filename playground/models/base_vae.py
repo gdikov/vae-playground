@@ -133,7 +133,18 @@ class BaseVariationalAutoencoder(object):
             data_probs.append(batch_probs)
 
         if isinstance(self.data_dim, tuple):
-            data_probs = np.concatenate(data_probs, axis=1)
+            if self.data_dim[0] == self.data_dim[1]:
+                data_probs = np.concatenate(data_probs, axis=1)
+            else:
+                data = []
+                data.append(np.zeros((batch_size, self.data_dim[0])))
+                data.append(np.zeros((batch_size, self.data_dim[1])))
+                for batch in data_probs:
+                    data[0] = np.concatenate((data[0], batch[0]), axis=0)
+                    data[1] = np.concatenate((data[1], batch[1]), axis=0)
+                data[0] = data[0][batch_size:]
+                data[1] = data[1][batch_size:]
+                data_probs = data
         else:
             data_probs = np.concatenate(data_probs, axis=0)
 
