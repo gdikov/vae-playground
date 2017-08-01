@@ -20,7 +20,7 @@ def synthetic(model='avb', pretrained_model=None, noise_mode='product'):
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
                                           experiment_name='synthetic', architecture='synthetic',
-                                          overwrite=True, optimiser_params={'lr': 0.001},
+                                          overwrite=True, save_best=True, optimiser_params={'lr': 0.001},
                                           pretrained_dir=pretrained_model)
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=data_dims[0],
@@ -29,6 +29,7 @@ def synthetic(model='avb', pretrained_model=None, noise_mode='product'):
                                                             'disc': {'lr': 1e-3, 'beta_1': 0.5}},
                                           schedule={'iter_disc': 3, 'iter_encdec': 1},
                                           overwrite=True,
+                                          save_best=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='synthetic',
                                           experiment_name='synthetic',
@@ -36,9 +37,13 @@ def synthetic(model='avb', pretrained_model=None, noise_mode='product'):
     else:
         raise ValueError("{} model not supported. Choose between `avb` and `vae`.".format(model))
 
-    model_dir = trainer.run_training(data, batch_size=4, epochs=1000,
+    model_dir = trainer.run_training(data, batch_size=4, epochs=10000,
                                      grouping_mode='by_targets',
-                                     save_interrupted=True)
+                                     save_interrupted=True,
+                                     validation_data=data,
+                                     validation_frequency=500,
+                                     validation_sampling_size=5)
+
     # model_dir = './output/tmp'
     trained_model = trainer.get_model()
 
@@ -104,8 +109,9 @@ def mnist_variations_one(model='avb', pretrained_model=None):
     elif model == 'avb':
         trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=64,
                                           use_adaptive_contrast=False,
-                                          optimiser_params={'encdec': {'lr': 1e-3, 'beta_1': 0.5},
-                                                            'disc': {'lr': 1e-3, 'beta_1': 0.5}},
+                                          optimiser_params={'encdec': {'lr': 1e-4, 'beta_1': 0.5},
+                                                            'disc': {'lr': 2e-4, 'beta_1': 0.5}},
+                                          schedule={'iter_disc': 1, 'iter_encdec': 1},
                                           overwrite=True, save_best=True,
                                           pretrained_dir=pretrained_model,
                                           architecture='mnist',
@@ -114,8 +120,8 @@ def mnist_variations_one(model='avb', pretrained_model=None):
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
     model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
-                                     save_interrupted=True,
                                      grouping_mode='by_pairs',
+                                     save_interrupted=True,
                                      validation_data=test_data,
                                      validation_frequency=20,
                                      validation_sampling_size=5)
