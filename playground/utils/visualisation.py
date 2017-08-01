@@ -67,6 +67,9 @@ def plot_latent_2d(latent_vars, target=None, fig_dirpath=None, fig_name=None):
     plt.figure(figsize=(6, 6))
     cmap = plt.get_cmap('viridis')
     if target is not None:
+        if target.dtype.type is np.str_:
+            map2digit = {k: i for i, k in enumerate(np.unique(target))}
+            target = list(map(lambda x: map2digit[x], target))
         plt.scatter(latent_vars[:, 0], latent_vars[:, 1], c=target, s=1, cmap=cmap)
     else:
         raise NotImplementedError

@@ -24,6 +24,27 @@ DATA_DIR = config['data_dir']
 np.random.seed(config['seed'])
 
 
+def join_datasets(datasets, shuffle=True):
+    """
+    Join multiple datasets into
+    Args:
+        datasets: tuple, dict datasets to be concatenated
+        shuffle: bool, whether to scramble the dataset upon concatenation
+
+    Returns:
+        dict of concatenated datasets
+    """
+    assert len(datasets) > 1, "Provide more than one dataset."
+    assert all([isinstance(d, dict) for d in datasets]), "Provide dict-types datasets"
+    permutation = np.random.permutation(datasets[0][list(datasets[0].keys())[0]])
+    concatenated = {}
+    for k in datasets[0].keys():
+        concatenated[k] = np.concatenate([d[k] for d in datasets], axis=0)
+        if shuffle:
+            concatenated[k] = concatenated[k][permutation]
+    return concatenated
+
+
 def load_usps(local_data_path=None):
     """
     Load the USPS dataset from local file or download it if not available.
@@ -169,105 +190,6 @@ def _load_svhn_from_file(data_dir=None, extra_set=False):
     labels = labels.flatten()
     # labels mapping maps 1-9 digits to 1-9 label, however 0 has label 10 (for some reason), hence the reassignment.
     labels[labels == 10] = 0
-
-    return images, labels
-
-
-def load_mnist_old(local_data_path=None, one_hot=True, binarised=True):
-    """
-    Load the MNIST dataset from local file or download it if not available.
-    
-    Args:
-        local_data_path: path to the MNIST dataset. Assumes unpacked files and original filenames. 
-        one_hot: bool whether tha data targets should be converted to one hot encoded labels
-        binarised: bool, whether the images should be ceiled/floored to 1 and 0 respectively.
-
-    Returns:
-        A dict with `data` and `target` keys with the MNIST data converted to [0, 1] floats. 
-    """
-
-    def convert_to_one_hot(raw_target):
-        n_uniques = len(np.unique(raw_target))
-        one_hot_target = np.zeros((raw_target.shape[0], n_uniques))
-        one_hot_target[np.arange(raw_target.shape[0]), raw_target.astype(np.int)] = 1
-        return one_hot_target
-
-    def binarise(raw_data, mode='sampling', **kwargs):
-        if mode == 'sampling':
-            return np.random.binomial(1, p=raw_data).astype(np.int32)
-        elif mode == 'threshold':
-            threshold = kwargs.get('threshold', 0.5)
-            return (raw_data > threshold).astype(np.int32)
-
-    # For the binarised MNIST dataset one can use the original version from:
-    #       http://www.cs.toronto.edu/~larocheh/public/datasets/binarized_mnist/binarized_mnist_train.amat
-    #       http://www.cs.toronto.edu/~larocheh/public/datasets/binarized_mnist/binarized_mnist_valid.amat
-    #       http://www.cs.toronto.edu/~larocheh/public/datasets/binarized_mnist/binarized_mnist_test.amat
-    #
-    # However this dataset does not contain label information and hence it is better go binarise it manually.
-
-    mnist_path = os.path.join(DATA_DIR, "MNIST_old")
-    if local_data_path is None and not os.path.exists(mnist_path):
-        logger.info("Path to locally stored data not provided. Proceeding with downloading the MNIST dataset.")
-        from tensorflow.examples.tutorials.mnist import input_data
-        mnist = input_data.read_data_sets(mnist_path, one_hot=one_hot)
-        for filename in os.listdir(mnist_path):
-            if filename.endswith('.gz'):
-                unzipped = gzip.open(os.path.join(mnist_path, filename), 'rb').read()
-                with open(os.path.join(mnist_path, filename[:-3]), 'wb') as f:
-                    f.write(unzipped)
-        mnist_data = np.concatenate((mnist.train.images, mnist.test.images, mnist.validation.images))
-        mnist_labels = np.concatenate((mnist.train.labels, mnist.test.labels, mnist.validation.labels))
-        mnist = {'data': mnist_data,
-                 'target': mnist_labels}
-    else:
-        local_data_path = local_data_path or mnist_path
-        logger.info("Loading MNIST dataset from {}".format(local_data_path))
-        if os.path.exists(local_data_path):
-            mnist_imgs, mnist_labels = _load_mnist_from_file_old(local_data_path)
-            if one_hot:
-                mnist_labels = convert_to_one_hot(mnist_labels)
-            mnist = {'data': mnist_imgs, 'target': mnist_labels}
-        else:
-            logger.error("Path to locally stored MNIST does not exist.")
-            raise ValueError
-
-    if binarised:
-        mnist['data'] = binarise(mnist['data'], mode='threshold')
-
-    return mnist
-
-
-def _load_mnist_from_file_old(data_dir=None):
-    """
-    Load the binary files from disk. 
-    
-    Args:
-        data_dir: path to folder containing the MNIST dataset blobs. 
-
-    Returns:
-        A numpy array with the images and a numpy array with the corresponding labels. 
-    """
-    # The files are assumed to have these names and should be found in 'path'
-    image_files = ('train-images-idx3-ubyte', 't10k-images-idx3-ubyte')
-    label_files = ('train-labels-idx1-ubyte', 't10k-labels-idx1-ubyte')
-
-    def read_labels(fname):
-        with open(os.path.join(data_dir, fname), 'rb') as flbl:
-            # remove header
-            struct.unpack(">II", flbl.read(8))
-            digit_labels = np.fromfile(flbl, dtype=np.int8)
-        return digit_labels
-
-    def read_images(fname):
-        with open(os.path.join(data_dir, fname), 'rb') as fimg:
-            # remove header
-            magic, num, rows, cols = struct.unpack(">IIII", fimg.read(16))
-            digit_images = np.fromfile(fimg, dtype=np.uint8).reshape(num, -1)
-        return digit_images
-
-    images = np.concatenate([read_images(fname) for fname in image_files]) / 255.
-    labels = np.concatenate([read_labels(fname) for fname in label_files])
 
     return images, labels
 

@@ -200,7 +200,7 @@ class AVBModelTrainer(ModelTrainer):
                                                 optimiser_params=optimiser_params,
                                                 resume_from=pretrained_dir,
                                                 experiment_architecture=architecture)
-        self.schedule = schedule or {'iter_discr': 1, 'iter_encdec': 1}
+        self.schedule = schedule or {'iter_disc': 1, 'iter_encdec': 1}
         super(AVBModelTrainer, self).__init__(model=avb_model, experiment_name=experiment_name,
                                               overwrite=overwrite, save_best=save_best)
 
@@ -217,7 +217,7 @@ class AVBModelTrainer(ModelTrainer):
             A loss history dict with discriminator and encoder-decoder losses.
         """
         loss_hisotry = self.model.fit(data, batch_size, epochs=epochs,
-                                      discriminator_repetitions=self.schedule['iter_discr'],
+                                      discriminator_repetitions=self.schedule['iter_disc'],
                                       adaptive_contrast_sampling_steps=10, **kwargs)
         return loss_hisotry
 
