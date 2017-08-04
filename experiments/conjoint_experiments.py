@@ -320,8 +320,6 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
                 if bg_same_target and target_same:
                     break
 
-        print(data_1['target'][id_num], data_0['target'][id_bg_0], data_1['target'][id_bg_1])
-
         # Create data set from found pictures, random digits with other backgrounds than num_data
         bg_data = (
             {'data': asarray(data_0['data'][id_bg_0]).reshape((1, 784)),
@@ -346,17 +344,15 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
         original_num_0 = num_data[0]['data'].reshape((28, 28))
         reconst_0 = reconstruction_original[0, 0].reshape((28, 28))
         new_bg_0 = reconstruction_mixed[0, 0].reshape((28, 28))
-        original_bg_0 = bg_data[0]['data'].reshape((28, 28))
 
         # Right encoder
         original_num_1 = num_data[1]['data'].reshape((28, 28))
         reconst_1 = reconstruction_original[1, 0].reshape((28, 28))
         new_bg_1 = reconstruction_mixed[1, 0].reshape((28, 28))
-        original_bg_1 = bg_data[1]['data'].reshape((28, 28))
 
         row = concatenate(
-            (original_num_0, reconst_0, new_bg_0,original_bg_0, ones((28, 5)),
-             original_num_1, reconst_1, new_bg_1,original_bg_1),
+            (original_num_0, reconst_0, new_bg_0, ones((28, 5)),
+             original_num_1, reconst_1, new_bg_1),
             axis=1)
         try:
             img = concatenate((img, row), axis=0)
