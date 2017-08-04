@@ -226,3 +226,48 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
 
     clear_session()
     return model_dir
+
+def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
+    logger.info("Creating plot of digits with changed background, by saving shared latent space")
+    data_dims = (784, 784)
+    latent_dims = (2, 2, 2)
+
+    datasets = kwargs.get('dataset_pairs', [('horizontal', 'trippy'), ('vertical', 'black')])
+    cmnist = CustomMNIST()
+    data = []
+    for dataset in datasets:
+        custom_data = cmnist.load_dataset('_'.join(dataset), generate_if_none=True)
+        data.append(custom_data)
+    train_data = tuple([{k: d[k][:-100] for k in d.keys()} for d in data])
+    test_data = tuple([{k: d[k][-100:] for k in d.keys()} for d in data])
+
+    if model == 'vae':
+        trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
+                                          experiment_name='mnist_variations_two', architecture='mnist',
+                                          overwrite=True, save_best=True,
+                                          optimiser_params={'lr': 0.0007, 'beta_1': 0.5},
+                                          pretrained_dir=pretrained_model)
+    elif model == 'avb':
+        trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=64,
+                                          use_adaptive_contrast=False,
+                                          noise_mode='add',
+                                          optimiser_params={'encdec': {'lr': 0.001, 'beta_1': 0.5},
+                                                            'disc': {'lr': 0.001, 'beta_1': 0.5}},
+                                          schedule={'iter_disc': 3, 'iter_encdec': 1},
+                                          overwrite=True, save_best=True,
+                                          pretrained_dir=pretrained_model,
+                                          architecture='mnist',
+                                          experiment_name='mnist_variations_two')
+    else:
+        raise ValueError("Currently only `avb` and `vae` are supported.")
+
+    model_dir = trainer.run_training(data, batch_size=100, epochs=0,
+                                     save_interrupted=True,
+                                     grouping_mode='by_pairs',
+                                     validation_data=test_data,
+                                     validation_frequency=1,
+                                     validation_sampling_size=5)
+    # model_dir = 'output/tmp'
+    trained_model = trainer.get_model()
+
+    #TODO: Save shared latent space when two inputs have same digits but different backgrounds
