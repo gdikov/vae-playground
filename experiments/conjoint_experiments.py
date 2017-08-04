@@ -2,7 +2,7 @@ from __future__ import division
 
 from numpy import save as save_array
 from os.path import join as path_join
-from numpy import repeat, asarray, concatenate, copy
+from numpy import repeat, asarray, concatenate, copy, ones
 from numpy.random import randint
 from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
@@ -229,12 +229,26 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
     clear_session()
     return model_dir
 
+
 def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
+    """
+    Experiment to change backgrounds by means of saving the shared latent space and updating the private latent space 
+    with new image that has different background.
+    Explanation of plotted digits:
+    In each row, the left three digits correspond to the first encoder, the right three to the second.
+    From left to right: Original, reconstruction, changed background.
+    
+    Args:
+        model: avb or vae 
+        pretrained_model: dictionary with h5 file in it 
+        **kwargs: optionally specify backgrounds of data sets
+
+    """
     logger.info("Creating plot of digits with changed background, by saving shared latent space")
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
 
-    datasets = kwargs.get('dataset_pairs', [('horizontal', 'trippy'), ('vertical', 'black')])
+    datasets = kwargs.get('dataset_pairs', [('horizontal', 'vertical'), ('trippy', 'black')])
     cmnist = CustomMNIST()
     data = []
     for dataset in datasets:
@@ -269,7 +283,7 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
     trained_model = trainer.get_model()
 
     max_index = 49999
-    data_0,data_1 = data
+    data_0, data_1 = data
     for _ in range(15):
         # id_num is ID of image used for digit, id_bg of image used for background
         id_num = randint(max_index)
@@ -313,17 +327,28 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
         reconstruction_original = trained_model.generate(1, 1, latent_samples=latent_num)
         reconstruction_mixed = trained_model.generate(1, 1, latent_samples=latent_mixed)
 
-        num_0 = num_data[0]['data'].reshape((28, 28))
+        # Left encoder
+        original_num_0 = num_data[0]['data'].reshape((28, 28))
+        # original_bg_0 = bg_data[0]['data'].reshape((28, 28))
         reconst_0 = reconstruction_original[0, 0].reshape((28, 28))
-        num_1 = num_data[1]['data'].reshape((28, 28))
+        new_bg_0 = reconstruction_mixed[0, 0].reshape((28, 28))
+
+        # Right encoder
+        original_num_1 = num_data[1]['data'].reshape((28, 28))
+        # original_bg_1 = bg_data[1]['data'].reshape((28, 28))
         reconst_1 = reconstruction_original[1, 0].reshape((28, 28))
-        row = concatenate((num_0, reconst_0, num_1, reconst_1), axis=1)
+        new_bg_1 = reconstruction_mixed[1, 0].reshape((28, 28))
+
+        row = concatenate(
+            (original_num_0, reconst_0, new_bg_0, ones((28, 5)),
+             original_num_1, reconst_1, new_bg_1),
+            axis=1)
         try:
             img = concatenate((img, row), axis=0)
         except NameError:
             img = row
 
     plt.imshow(img, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
-    plt.savefig('output/changed_background_save_latent.png')
+    plt.savefig('output/change_background/changed_background_save_latent.png')
 
     clear_session()
