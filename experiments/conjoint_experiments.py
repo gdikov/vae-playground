@@ -2,13 +2,15 @@ from __future__ import division
 
 from numpy import save as save_array
 from os.path import join as path_join
-from numpy import repeat
+from numpy import repeat, asarray, concatenate, copy
+from numpy.random import randint
 from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
 from playground.utils.datasets import load_conjoint_synthetic, load_mnist
 from playground.utils.data_factory import CustomMNIST
 from playground.utils.logger import logger
 from keras.backend import clear_session
+import matplotlib.pyplot as plt
 
 
 def synthetic(model='avb', pretrained_model=None, noise_mode='product'):
@@ -238,8 +240,7 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
     for dataset in datasets:
         custom_data = cmnist.load_dataset('_'.join(dataset), generate_if_none=True)
         data.append(custom_data)
-    train_data = tuple([{k: d[k][:-100] for k in d.keys()} for d in data])
-    test_data = tuple([{k: d[k][-100:] for k in d.keys()} for d in data])
+    data = tuple([{k: d[k][:] for k in d.keys()} for d in data])
 
     if model == 'vae':
         trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
@@ -263,11 +264,66 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
 
     model_dir = trainer.run_training(data, batch_size=100, epochs=0,
                                      save_interrupted=True,
-                                     grouping_mode='by_pairs',
-                                     validation_data=test_data,
-                                     validation_frequency=1,
-                                     validation_sampling_size=5)
+                                     grouping_mode='by_pairs')
     # model_dir = 'output/tmp'
     trained_model = trainer.get_model()
 
-    #TODO: Save shared latent space when two inputs have same digits but different backgrounds
+    max_index = 49999
+    data_0,data_1 = data
+    for _ in range(15):
+        # id_num is ID of image used for digit, id_bg of image used for background
+        id_num = randint(max_index)
+
+        # Data set with same digit in front of 2 different backgrounds
+        num_data = (
+            {'data': asarray(data_0['data'][id_num]).reshape((1, 784)),
+             'target': asarray(data_0['target'][id_num])},
+            {'data': asarray(data_1['data'][id_num]).reshape((1, 784)),
+             'target': asarray(data_1['target'][id_num])})
+
+        # Find a picture with a different background for each encoder (no matter the digit)
+        while True:
+            id_bg_0 = randint(max_index)
+            # Cannot have same background as image of digit
+            if data_0['tag'][id_num] != data_0['tag'][id_bg_0]:
+                break
+
+        while True:
+            id_bg_1 = randint(max_index)
+            if data_1['tag'][id_num] != data_1['tag'][id_bg_1]:
+                break
+
+        # Create data set from found pictures, random digits with other backgrounds than num_data
+        bg_data = (
+            {'data': asarray(data_0['data'][id_bg_0]).reshape((1, 784)),
+             'target': asarray(data_0['target'][id_bg_0])},
+            {'data': asarray(data_1['data'][id_bg_1]).reshape((1, 784)),
+             'target': asarray(data_1['target'][id_bg_1])})
+
+        # Infer latent variables for num_data and bg_data set
+        latent_num = trained_model.infer(num_data, batch_size=1, sampling_size=1)
+        latent_bg = trained_model.infer(bg_data, batch_size=1, sampling_size=1)
+
+        # Mixed has shared latent space of digits and private latent spaced of backgrounds
+        latent_mixed = copy(latent_bg)
+        for i in (4, 5):
+            latent_mixed[0][i] = latent_num[0][i]
+
+        # Reconstruct from mixed and the two pure shared latent spaces
+        reconstruction_original = trained_model.generate(1, 1, latent_samples=latent_num)
+        reconstruction_mixed = trained_model.generate(1, 1, latent_samples=latent_mixed)
+
+        num_0 = num_data[0]['data'].reshape((28, 28))
+        reconst_0 = reconstruction_original[0, 0].reshape((28, 28))
+        num_1 = num_data[1]['data'].reshape((28, 28))
+        reconst_1 = reconstruction_original[1, 0].reshape((28, 28))
+        row = concatenate((num_0, reconst_0, num_1, reconst_1), axis=1)
+        try:
+            img = concatenate((img, row), axis=0)
+        except NameError:
+            img = row
+
+    plt.imshow(img, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
+    plt.savefig('output/changed_background_save_latent.png')
+
+    clear_session()
