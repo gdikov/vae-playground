@@ -285,10 +285,9 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
 
     max_index = 49999
     data_0, data_1 = data
-    for _ in range(20):
-        # id_num is ID of image used for digit, id_bg of image used for background
-        id_num = randint(max_index)
-
+    id_num_list = randint(max_index,size=12)
+    # id_num is ID of image used for digit, id_bg of image used for background
+    for id_num in id_num_list:
         # Data set with same digit in front of 2 different backgrounds
         num_data = (
             {'data': asarray(data_0['data'][id_num]).reshape((1, 784)),
@@ -312,7 +311,7 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
         # Same thing for second encoder
         while True:
             id_bg_1 = randint(max_index)
-            tags_same = data_1['tag'][id_num] != data_1['tag'][id_bg_1]
+            tags_same = data_1['tag'][id_num] == data_1['tag'][id_bg_1]
             target_same = data_1['target'][id_num] == data_1['target'][id_bg_1]
             if not tags_same:
                 if not bg_same_target and not target_same:
@@ -360,9 +359,9 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
             img = row
 
     plt.imshow(img, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
-    filename = "change_background_save_latent"
+    filename = "ChangeBackground_SavedLatent"
     if bg_same_target:
-        filename = '_'.join((filename, 'bg_same_target'))
+        filename = '_'.join((filename, 'BgSameTarget'))
     save_path = path_join('output', 'change_background', filename)
     plt.savefig(save_path)
 
