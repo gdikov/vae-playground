@@ -248,6 +248,7 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
 
+    bg_same_target = kwargs.get('bg_same_target', False)
     datasets = kwargs.get('dataset_pairs', [('horizontal', 'vertical'), ('trippy', 'black')])
     cmnist = CustomMNIST()
     data = []
@@ -284,7 +285,7 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
 
     max_index = 49999
     data_0, data_1 = data
-    for _ in range(15):
+    for _ in range(20):
         # id_num is ID of image used for digit, id_bg of image used for background
         id_num = randint(max_index)
 
@@ -295,17 +296,31 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
             {'data': asarray(data_1['data'][id_num]).reshape((1, 784)),
              'target': asarray(data_1['target'][id_num])})
 
-        # Find a picture with a different background for each encoder (no matter the digit)
+        # Find a picture with a different background for first encoder
+        # If the "bg_same_target"-flag is True, the background has the same digit written differently
         while True:
             id_bg_0 = randint(max_index)
             # Cannot have same background as image of digit
-            if data_0['tag'][id_num] != data_0['tag'][id_bg_0]:
-                break
+            tags_same = data_0['tag'][id_num] == data_0['tag'][id_bg_0]
+            target_same = data_0['target'][id_num] == data_0['target'][id_bg_0]
+            if not tags_same:
+                if not bg_same_target and not target_same:
+                    break
+                if bg_same_target and target_same:
+                    break
 
+        # Same thing for second encoder
         while True:
             id_bg_1 = randint(max_index)
-            if data_1['tag'][id_num] != data_1['tag'][id_bg_1]:
-                break
+            tags_same = data_1['tag'][id_num] != data_1['tag'][id_bg_1]
+            target_same = data_1['target'][id_num] == data_1['target'][id_bg_1]
+            if not tags_same:
+                if not bg_same_target and not target_same:
+                    break
+                if bg_same_target and target_same:
+                    break
+
+        print(data_1['target'][id_num], data_0['target'][id_bg_0], data_1['target'][id_bg_1])
 
         # Create data set from found pictures, random digits with other backgrounds than num_data
         bg_data = (
@@ -329,19 +344,19 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
 
         # Left encoder
         original_num_0 = num_data[0]['data'].reshape((28, 28))
-        # original_bg_0 = bg_data[0]['data'].reshape((28, 28))
         reconst_0 = reconstruction_original[0, 0].reshape((28, 28))
         new_bg_0 = reconstruction_mixed[0, 0].reshape((28, 28))
+        original_bg_0 = bg_data[0]['data'].reshape((28, 28))
 
         # Right encoder
         original_num_1 = num_data[1]['data'].reshape((28, 28))
-        # original_bg_1 = bg_data[1]['data'].reshape((28, 28))
         reconst_1 = reconstruction_original[1, 0].reshape((28, 28))
         new_bg_1 = reconstruction_mixed[1, 0].reshape((28, 28))
+        original_bg_1 = bg_data[1]['data'].reshape((28, 28))
 
         row = concatenate(
-            (original_num_0, reconst_0, new_bg_0, ones((28, 5)),
-             original_num_1, reconst_1, new_bg_1),
+            (original_num_0, reconst_0, new_bg_0,original_bg_0, ones((28, 5)),
+             original_num_1, reconst_1, new_bg_1,original_bg_1),
             axis=1)
         try:
             img = concatenate((img, row), axis=0)
@@ -349,6 +364,10 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
             img = row
 
     plt.imshow(img, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
-    plt.savefig('output/change_background/changed_background_save_latent.png')
+    filename = "change_background_save_latent"
+    if bg_same_target:
+        filename = '_'.join((filename, 'bg_same_target'))
+    save_path = path_join('output', 'change_background', filename)
+    plt.savefig(save_path)
 
     clear_session()
