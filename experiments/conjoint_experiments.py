@@ -1,9 +1,10 @@
 from __future__ import division
 
 from numpy import save as save_array
+from numpy.random import choice as rand_choice
 from os.path import join as path_join
 from numpy import repeat
-from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
+from playground.utils.visualisation import *
 from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
 from playground.utils.datasets import load_conjoint_synthetic, load_mnist
 from playground.utils.data_factory import CustomMNIST
@@ -223,6 +224,69 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
     save_array(path_join(model_dir, 'generated_samples.npy'), generations)
     for i, gen in enumerate(generations):
         plot_sampled_data(gen, fig_dirpath=model_dir, fig_name='data_{}'.format(i))
+
+    clear_session()
+    return model_dir
+
+
+def mnist_background_transfer(model='avb', pretrained_model=None, data=None, **kwargs):
+    if pretrained_model is None:
+        raise ValueError("Background transfer requires a pre-trained model. "
+                         "Provide path to the {} model.".format(model))
+        # or maybe a default model should be loaded?
+    if data is None:
+        datasets = kwargs.get('dataset_pairs', [('horizontal', 'trippy'), ('vertical', 'black')])
+        logger.info("Loading random MNIST samples and backgrounds assuming dataset pairs are {}".format(datasets))
+        n_samples = kwargs.get('n_samples', 10)
+
+        cmnist = CustomMNIST()
+        digit_data = cmnist.load_dataset('_'.join(datasets[0]), generate_if_none=True)
+
+        background_data, background_tags = [], []
+        for s in rand_choice(datasets[1], size=n_samples, replace=True):
+            background = cmnist.generate_style(style=s)
+            background_data.append(background['image'].ravel())
+            background_tags.append(datasets[1].index(background['tag']))
+
+        data_size = digit_data['target'].size
+        ids = rand_choice(data_size, size=n_samples, replace=n_samples > data_size)
+        data = tuple([{k: digit_data[k][ids] for k in digit_data.keys()},
+                      {'data': background_data, 'target': digit_data['target'][ids], 'tag': background_tags}])
+    else:
+        n_samples = len(data[0]['target'])
+
+    logger.info("Starting a background transfer experiment using a {} model.".format(model))
+
+    data_dims = (784, 784)
+    latent_dims = (2, 2, 2)
+
+    if model == 'vae':
+        trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
+                                          experiment_name='mnist_background_transfer', architecture='mnist',
+                                          pretrained_dir=pretrained_model)
+    elif model == 'avb':
+        trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=64,
+                                          noise_mode='add',
+                                          pretrained_dir=pretrained_model,
+                                          architecture='mnist',
+                                          experiment_name='mnist_background_transfer')
+    else:
+        raise ValueError("{} model not supported. Choose between `avb` and `vae`.".format(model))
+
+    model_dir = trainer.get_experiment_dir()
+    trained_model = trainer.get_model()
+
+    n_iter = kwargs.get('n_iter', 5)
+    original_data = data
+    transitions = []
+    for i in range(n_iter):
+        reconstructions = trained_model.reconstruct(data, batch_size=min(n_samples, 100), sampling_size=1)
+        data = tuple([data[0], {'data': reconstructions[1], 'target': data[1]['target'], 'tag': data[1]['tag']}])
+        transitions.append(reconstructions[1])
+    save_array(path_join(model_dir, 'background_transitions.npy'), transitions)
+    plot_iterative_background_transfer([d['data'] for d in original_data], transitions,
+                                       fig_dirpath=model_dir,
+                                       fig_name='background_transfer.png')
 
     clear_session()
     return model_dir

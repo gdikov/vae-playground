@@ -141,7 +141,7 @@ class CustomMNIST(object):
         self.styles = self.pattern_generator.get_styles()
         self.cache = {}
 
-    def _generate_style(self, style, **kwargs):
+    def generate_style(self, style, **kwargs):
         self.cache = {}
         as_gray = kwargs.get('as_gray', True)
         if style in self.cache.keys():
@@ -193,7 +193,7 @@ class CustomMNIST(object):
         s_ids = np.random.choice(self.styles, size=n_samples, replace=True, p=style_distribution)
         l_ids = np.random.choice(self.unique_labels.size, size=n_samples, replace=True, p=label_distribution)
         for s_id, l_id in zip(s_ids, l_ids):
-            new_sample_background = self._generate_style(style=s_id, **kwargs)
+            new_sample_background = self.generate_style(style=s_id, **kwargs)
             random_id = np.random.choice(len(self.grouped_data[l_id]))
             newly_composed_digit = self._compose_new(new_sample_background['image'],
                                                      self.grouped_data[l_id][random_id])
@@ -223,7 +223,7 @@ class CustomMNIST(object):
         logger.info("Augmenting MNIST dataset with background classes {} (distribution: {})".format(classes, counts))
         for id_ in range(data_size):
             s_id = s_ids[id_]
-            new_sample_background = self._generate_style(style=s_id, **kwargs)
+            new_sample_background = self.generate_style(style=s_id, **kwargs)
             newly_composed_digit = self._compose_new(new_sample_background['image'], self.data['data'][id_])
             augmented_data['data'].append(newly_composed_digit)
             augmented_data['target'].append(self.data['target'][id_])
