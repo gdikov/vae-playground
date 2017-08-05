@@ -7,7 +7,7 @@ from numpy.random import randint
 from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
 from playground.utils.datasets import load_conjoint_synthetic, load_mnist
-from playground.utils.data_factory import CustomMNIST
+from playground.utils.data_factory import CustomMNIST, PatternFactory
 from playground.utils.logger import logger
 from keras.backend import clear_session
 import matplotlib.pyplot as plt
@@ -373,6 +373,7 @@ def change_background_generate_digit(model='vae', pretrained_model=None, **kwarg
     data_dims = (784, 784)
     latent_dims = (2, 2, 2)
     datasets = kwargs.get('dataset_pairs', [('horizontal', 'vertical'), ('trippy', 'black')])
+    bg = kwargs.get('bg', 'black')
     cmnist = CustomMNIST()
     data = []
     for dataset in datasets:
@@ -412,10 +413,13 @@ def change_background_generate_digit(model='vae', pretrained_model=None, **kwarg
     id_num_list = randint(max_index, size = iterations+1)
     # id_num is ID of image used for digit, id_bg of image used for background
     for id_num in id_num_list:
+        if bg == 'black':
+            new_img = zeros((1, 784))
+        elif bg == 'trippy':
+            new_img = PatternFactory().render_trippy((28,28),as_gray=True)['image'].reshape((1,784))
         org_img = asarray(data_0['data'][id_num]).reshape((1, 784))
-        target = asarray(data_0['target'][id_num])
-        new_img = zeros((1, 784))
         digits = [asarray(data_0['data'][id_num]).reshape((28,28))]
+        target = asarray(data_0['target'][id_num])
 
         for iter in range(iterations):
             # Data set with original image and new image, at the beginning new image is just empty background
@@ -437,6 +441,7 @@ def change_background_generate_digit(model='vae', pretrained_model=None, **kwarg
 
     plt.imshow(img, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
     filename = "ChangeBackground_GenerateDigit"
+    filename += ('_' + bg)
     save_path = path_join('output', 'change_background', filename)
     plt.savefig(save_path)
 
