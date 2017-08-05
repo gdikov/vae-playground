@@ -2,7 +2,7 @@ from __future__ import division
 
 from numpy import save as save_array
 from os.path import join as path_join
-from numpy import repeat, asarray, concatenate, copy, ones
+from numpy import repeat, asarray, concatenate, copy, zeros, ones
 from numpy.random import randint
 from playground.utils.visualisation import plot_latent_2d, plot_sampled_data, plot_reconstructed_data
 from playground.model_trainer import ConjointVAEModelTrainer, ConjointAVBModelTrainer
@@ -285,7 +285,7 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
 
     max_index = 49999
     data_0, data_1 = data
-    id_num_list = randint(max_index,size=12)
+    id_num_list = randint(max_index, size=12)
     # id_num is ID of image used for digit, id_bg of image used for background
     for id_num in id_num_list:
         # Data set with same digit in front of 2 different backgrounds
@@ -362,6 +362,81 @@ def change_background_save_latent(model='avb', pretrained_model=None, **kwargs):
     filename = "ChangeBackground_SavedLatent"
     if bg_same_target:
         filename = '_'.join((filename, 'BgSameTarget'))
+    save_path = path_join('output', 'change_background', filename)
+    plt.savefig(save_path)
+
+    clear_session()
+
+
+def change_background_generate_digit(model='vae', pretrained_model=None, **kwargs):
+    logger.info("Creating plot of digits with changed background, by generating digit on empty background")
+    data_dims = (784, 784)
+    latent_dims = (2, 2, 2)
+    datasets = kwargs.get('dataset_pairs', [('horizontal', 'vertical'), ('trippy', 'black')])
+    cmnist = CustomMNIST()
+    data = []
+    for dataset in datasets:
+        custom_data = cmnist.load_dataset('_'.join(dataset), generate_if_none=True)
+        data.append(custom_data)
+    data = tuple([{k: d[k][:] for k in d.keys()} for d in data])
+
+    if model == 'vae':
+        trainer = ConjointVAEModelTrainer(data_dims=data_dims, latent_dims=latent_dims,
+                                          experiment_name='mnist_variations_two', architecture='mnist',
+                                          overwrite=True, save_best=True,
+                                          optimiser_params={'lr': 0.0007, 'beta_1': 0.5},
+                                          pretrained_dir=pretrained_model)
+    elif model == 'avb':
+        trainer = ConjointAVBModelTrainer(data_dims=data_dims, latent_dims=latent_dims, noise_dim=64,
+                                          use_adaptive_contrast=False,
+                                          noise_mode='add',
+                                          optimiser_params={'encdec': {'lr': 0.001, 'beta_1': 0.5},
+                                                            'disc': {'lr': 0.001, 'beta_1': 0.5}},
+                                          schedule={'iter_disc': 3, 'iter_encdec': 1},
+                                          overwrite=True, save_best=True,
+                                          pretrained_dir=pretrained_model,
+                                          architecture='mnist',
+                                          experiment_name='mnist_variations_two')
+    else:
+        raise ValueError("Currently only `avb` and `vae` are supported.")
+
+    model_dir = trainer.run_training(data, batch_size=100, epochs=0,
+                                     save_interrupted=True,
+                                     grouping_mode='by_pairs')
+    # model_dir = 'output/tmp'
+    trained_model = trainer.get_model()
+
+    max_index = 49999
+    iterations = 14
+    data_0, data_1 = data
+    id_num_list = randint(max_index, size = iterations+1)
+    # id_num is ID of image used for digit, id_bg of image used for background
+    for id_num in id_num_list:
+        org_img = asarray(data_0['data'][id_num]).reshape((1, 784))
+        target = asarray(data_0['target'][id_num])
+        new_img = zeros((1, 784))
+        digits = [asarray(data_0['data'][id_num]).reshape((28,28))]
+
+        for iter in range(iterations):
+            # Data set with original image and new image, at the beginning new image is just empty background
+            input_data = ({'data': org_img, 'target': target}, {'data': new_img, 'target': target})
+
+            # Infer latent variables
+            latent = trained_model.infer(input_data, batch_size=1, sampling_size=1)
+
+            # Reconstruct image
+            reconstruction = trained_model.generate(1, 1, latent_samples=latent)
+            digits.append(reconstruction[1, 0].reshape((28, 28)))
+            new_img = reconstruction[1, 0].reshape((1, 784))
+
+        row = concatenate(digits, axis=1)
+        try:
+            img = concatenate((img, row), axis=0)
+        except NameError:
+            img = row
+
+    plt.imshow(img, cmap='gray', interpolation='nearest', vmin=0, vmax=1)
+    filename = "ChangeBackground_GenerateDigit"
     save_path = path_join('output', 'change_background', filename)
     plt.savefig(save_path)
 
