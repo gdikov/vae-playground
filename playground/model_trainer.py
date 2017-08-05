@@ -49,6 +49,15 @@ class ModelTrainer(object):
         """
         return self.model
 
+    def get_experiment_dir(self):
+        """
+        Return the model and experiment specific directory.
+
+        Returns:
+            A string with the relative experiment path.
+        """
+        return self.experiment_dir
+
     def _plot_loss(self, loss_history):
         """
         Plot the graph of the loss during training.

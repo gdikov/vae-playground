@@ -143,8 +143,8 @@ def plot_reconstructed_data(data, reconstructed_data, fig_dirpath=None, fig_name
 
     # pad data with 0s if data sample size is not a square number
     if sample_side_size ** 2 < data_dim:
-        next_larges_square_num = int(np.ceil(np.sqrt(data_dim))) ** 2
-        total_size = pad_to_size or next_larges_square_num
+        next_largest_square_num = int(np.ceil(np.sqrt(data_dim))) ** 2
+        total_size = pad_to_size or next_largest_square_num
         data = np.concatenate([data, np.zeros((data_size, total_size - data_dim))], axis=-1)
         reconstructed_data = np.concatenate([reconstructed_data, np.zeros((data_size, total_size - data_dim))], axis=-1)
         sample_side_size = int(np.sqrt(total_size))
@@ -161,6 +161,37 @@ def plot_reconstructed_data(data, reconstructed_data, fig_dirpath=None, fig_name
     combined_data_reconstructions = np.concatenate(np.concatenate(combined_data_reconstructions, axis=1), axis=1)
     plt.figure(figsize=(10, 10))
     plt.imshow(combined_data_reconstructions, cmap='Greys_r')
+    if fig_dirpath is not None:
+        if not os.path.exists(fig_dirpath):
+            os.makedirs(fig_dirpath)
+        plt.savefig(os.path.join(fig_dirpath, fig_name))
+    else:
+        plt.show()
+
+
+def plot_iterative_background_transfer(data_pairs, transitions, fig_dirpath=None, fig_name=None):
+    data_pairs = np.asarray(data_pairs)
+    transitions = np.asarray(transitions)
+
+    logger.info("Plotting background transition data.")
+    fig_name = fig_name or 'background_transition.png'
+    if not fig_name.endswith('.png'):
+        fig_name += '.png'
+
+    data_size, data_dim = data_pairs[0].shape
+    sample_side_size = int(np.sqrt(data_dim))
+
+    # first axis is the number of combined data samples (normally 2 -- fore- and background)
+    data_pairs = data_pairs.reshape(-1, data_size, sample_side_size, sample_side_size).transpose(1, 0, 2, 3)
+    data_pairs = np.concatenate(np.concatenate(data_pairs, axis=1), axis=1)
+    # first axis is the number of iterations to refine the mixing, so swap with the sample axis to align to data_pairs
+    transitions = transitions.reshape(-1, data_size, sample_side_size, sample_side_size).transpose(1, 0, 2, 3)
+    transitions = np.concatenate(np.concatenate(transitions, axis=1), axis=1)
+
+    combined_data_transitions = np.concatenate([data_pairs, transitions], axis=-1)
+
+    plt.figure(figsize=(10, 10))
+    plt.imshow(combined_data_transitions, cmap='Greys_r')
     if fig_dirpath is not None:
         if not os.path.exists(fig_dirpath):
             os.makedirs(fig_dirpath)
