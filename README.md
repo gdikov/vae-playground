@@ -1,4 +1,4 @@
-Various Experimentats with Variational Autoencoders
+Various Experiments with Variational Autoencoders
 ===================================================
 
 ## Description
@@ -21,7 +21,7 @@ Very likely the code will also run using a Python 2.7 interpreter but is not tes
 Currently, the repository contains the implementation of vanilla Gaussian VAE [2], AVB
 as well as siamese (also called _conjoint_) variants of the two.
 While the first two models are thoroughly described in the cited papers, I couldn't find
-any reference for the Siamese Autoencoders (SAE), though there surely is one.
+any reference for the Siamese Autoencoders (SAE), though there surely is at least one.
 
 The motivation for SAE is that multiple datasets can share common structures or features
 and that these could be stored in a _shared_ latent space. Additionally each autoencoder in
