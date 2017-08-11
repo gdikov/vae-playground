@@ -12,7 +12,7 @@ from playground.utils.logger import logger
 from keras.backend import clear_session
 
 
-def synthetic(model='avb', pretrained_model=None, noise_mode='product'):
+def synthetic(model='avb', pretrained_model=None, noise_mode='product', **kwargs):
     logger.info("Starting a conjoint model experiment on the synthetic dataset.")
     data_dims = (8, 8)
     latent_dims = (2, 2, 2)
@@ -38,18 +38,22 @@ def synthetic(model='avb', pretrained_model=None, noise_mode='product'):
     else:
         raise ValueError("{} model not supported. Choose between `avb` and `vae`.".format(model))
 
-    model_dir = trainer.run_training(data, batch_size=4, epochs=10000,
-                                     grouping_mode='by_targets',
-                                     save_interrupted=True,
-                                     validation_data=data,
-                                     validation_frequency=500,
-                                     validation_sampling_size=5)
+    eval_only = kwargs.get('evaluate_only', False)
+    if not eval_only:
+        model_dir = trainer.run_training(data, batch_size=16, epochs=10000,
+                                         grouping_mode='by_targets',
+                                         save_interrupted=True,
+                                         validation_data=data,
+                                         validation_frequency=500,
+                                         validation_sampling_size=50)
+    else:
+        model_dir = trainer.get_experiment_dir()
 
-    # model_dir = './output/tmp'
     trained_model = trainer.get_model()
 
-    sampling_size = 1000
+    trained_model.evaluate(data, batch_size=100, sampling_size=5000, verbose=True)
 
+    sampling_size = 1000
     latent_vars = trained_model.infer(data, batch_size=4, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
     plot_latent_2d(latent_vars[:, -2:], repeat(data[0]['target'], sampling_size),
@@ -78,16 +82,16 @@ def synthetic(model='avb', pretrained_model=None, noise_mode='product'):
     return model_dir
 
 
-def mnist_variations(n_datasets=1, model='avb', pretrained_model=None):
+def mnist_variations(n_datasets=1, model='avb', pretrained_model=None, **kwargs):
     if n_datasets == 1:
-        mnist_variations_one(model=model, pretrained_model=pretrained_model)
+        mnist_variations_one(model=model, pretrained_model=pretrained_model, **kwargs)
     elif n_datasets == 2:
-        mnist_variations_two(model=model, pretrained_model=pretrained_model)
+        mnist_variations_two(model=model, pretrained_model=pretrained_model, **kwargs)
     else:
         raise NotImplementedError("Currently only 1 and 2 number of datasets per encoder are implemented.")
 
 
-def mnist_variations_one(model='avb', pretrained_model=None):
+def mnist_variations_one(model='avb', pretrained_model=None, **kwargs):
     logger.info("Starting a conjoint model experiment on the MNIST Variations "
                 "dataset (one dataset per autoencoder).")
     data_dims = (784, 784)
@@ -120,17 +124,22 @@ def mnist_variations_one(model='avb', pretrained_model=None):
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
-                                     grouping_mode='by_pairs',
-                                     save_interrupted=True,
-                                     validation_data=test_data,
-                                     validation_frequency=20,
-                                     validation_sampling_size=5)
-    # model_dir = 'output/tmp'
+    eval_only = kwargs.get('evaluate_only', False)
+    if not eval_only:
+        model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
+                                         grouping_mode='by_pairs',
+                                         save_interrupted=True,
+                                         validation_data=test_data,
+                                         validation_frequency=20,
+                                         validation_sampling_size=5)
+    else:
+        model_dir = trainer.get_experiment_dir()
+
     trained_model = trainer.get_model()
 
-    sampling_size = 1
+    trained_model.evaluate(test_data, batch_size=100, sampling_size=100, verbose=True)
 
+    sampling_size = 1
     latent_vars = trained_model.infer(train_data, batch_size=100, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
     plot_latent_2d(latent_vars[:, -2:], repeat(train_data[0]['target'], sampling_size),
@@ -192,17 +201,22 @@ def mnist_variations_two(model='avb', pretrained_model=None, **kwargs):
     else:
         raise ValueError("Currently only `avb` and `vae` are supported.")
 
-    model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
-                                     save_interrupted=True,
-                                     grouping_mode='by_pairs',
-                                     validation_data=test_data,
-                                     validation_frequency=1,
-                                     validation_sampling_size=5)
-    # model_dir = 'output/tmp'
+    eval_only = kwargs.get('evaluate_only', False)
+    if not eval_only:
+        model_dir = trainer.run_training(train_data, batch_size=100, epochs=1000,
+                                         save_interrupted=True,
+                                         grouping_mode='by_pairs',
+                                         validation_data=test_data,
+                                         validation_frequency=1,
+                                         validation_sampling_size=5)
+    else:
+        model_dir = trainer.get_experiment_dir()
+
     trained_model = trainer.get_model()
 
-    sampling_size = 1
+    trained_model.evaluate(test_data, batch_size=100, sampling_size=100, verbose=True)
 
+    sampling_size = 1
     latent_vars = trained_model.infer(train_data, batch_size=100, sampling_size=sampling_size)
     save_array(path_join(model_dir, 'latent_samples.npy'), latent_vars)
     plot_latent_2d(latent_vars[:, -2:], repeat(train_data[0]['target'], sampling_size),
