@@ -66,6 +66,7 @@ but rather the background (because of the well pronounced class separation in th
 
 ## Acknowledgements
 Many thanks to Maximilian Karl for the fruitful discussions and the invaluable advice!
+This code makes use of the [ITE](https://bitbucket.org/szzoli/ite/) package by Zoltán Szabó, which is placed in `third-party/ite`.
 
 ## References
 [1]: 
